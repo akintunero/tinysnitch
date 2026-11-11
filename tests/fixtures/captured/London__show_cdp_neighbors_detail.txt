@@ -1,0 +1,38 @@
+-------------------------
+Device ID: Manchester-PE-01
+Entry address(es): 
+  IP address: 192.168.10.1
+Platform: Cisco ,  Capabilities: Router Source-Route-Bridge 
+Interface: GigabitEthernet0/0,  Port ID (outgoing port): GigabitEthernet0/0
+Holdtime : 162 sec
+
+Version :
+Cisco IOS Software, IOSv Software (VIOS-ADVENTERPRISEK9-M), Version 15.9(3)M12, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2025 by Cisco Systems, Inc.
+Compiled Fri 19-Sep-25 07:49 by mcpre
+
+advertisement version: 2
+Management address(es): 
+  IP address: 192.168.10.1
+
+-------------------------
+Device ID: Paris-PE-01
+Entry address(es): 
+  IP address: 192.168.20.1
+Platform: Cisco ,  Capabilities: Router Source-Route-Bridge 
+Interface: GigabitEthernet0/2,  Port ID (outgoing port): GigabitEthernet0/2
+Holdtime : 177 sec
+
+Version :
+Cisco IOS Software, IOSv Software (VIOS-ADVENTERPRISEK9-M), Version 15.9(3)M12, RELEASE SOFTWARE (fc1)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2025 by Cisco Systems, Inc.
+Compiled Fri 19-Sep-25 07:49 by mcpre
+
+advertisement version: 2
+Management address(es): 
+  IP address: 192.168.20.1
+
+
+Total cdp entries displayed : 2

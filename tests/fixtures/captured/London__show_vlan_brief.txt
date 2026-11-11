@@ -1,0 +1,1 @@
+('Command execution failed', SubCommandFailure('sub_command failure, patterns matched in the output:', ['^%\\s*[Ii]nvalid (command|input)'], 'service result', "show vlan brief\r\nshow vlan brief\r\n          ^\r\n% Invalid input detected at '^' marker.\r\n\r\nLondon-PE-01#"))
