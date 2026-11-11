@@ -10,6 +10,14 @@ const BLOCKED: [RegExp, string][] = [
   [/^(do\s+)?(reload|reboot|restart)\b/i, "reloads the device"],
   [/^(do\s+)?(write\s+erase|erase|format|delete|fsck|squeeze)\b/i, "erases configuration or storage"],
   [/^(do\s+)?(copy|archive|configure\s+replace|boot|install|license|upgrade)\b/i, "moves files or changes software images"],
+  // Saving to startup is its own explicit step in the change workflow; `wr`, `wri`, `writ` and `write` are all the same command.
+  // (A bare `wr...` match would also catch the legitimate Catalyst QoS command `wrr-queue`, so it is spelled out.)
+  [/^(do\s+)?wr(i(te?)?)?\b/i, "saves the configuration; saving is a separate, explicit step"],
+  // Ways to run arbitrary commands from inside a configuration, which would walk around every rule in this file.
+  [/^(do\s+)?(tclsh|tclquit)\b/i, "starts or leaves a Tcl shell, which can run any command"],
+  [/\bcli\s+command\b/i, "runs arbitrary CLI commands from inside a configuration"],
+  [/\baction\b.*\bcli\b/i, "runs arbitrary CLI commands from inside a configuration"],
+  [/^action\s+\S+\s+(reload|reboot)\b/i, "reloads the device"],
   [/^crypto\s+key\s+(zeroize|generate|import)\b/i, "changes device keys"],
   [/^no\s+crypto\b/i, "removes crypto configuration"],
   [/^(do\s+)?(debug|undebug)\b/i, "debug output can overload a device"],
@@ -24,6 +32,7 @@ const BLOCKED: [RegExp, string][] = [
 ];
 
 const HIGH: [RegExp, string][] = [
+  [/^(no\s+)?(do\s+)?(event\s+manager|kron|alias)\b/i, "schedules or triggers commands, or redefines command names, outside what was reviewed"],
   [/^(username|enable\s+(secret|password)|aaa\b|tacacs|radius|snmp-server\s+(community|user|group))/i, "changes who can log in or manage the device"],
   [/^no\s+(username|enable|aaa|tacacs|radius)/i, "removes access control"],
   [/^no\s+feature\b/i, "turns off a whole NX-OS feature"],

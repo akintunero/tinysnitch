@@ -67,6 +67,50 @@ describe("configuration safety", () => {
   });
 });
 
+describe("lines that save, or that run commands from inside a configuration", () => {
+  const blocked = (lines: string[], why?: RegExp) => { for (const l of lines) { const a = assessLine(l); expect(a.risk, l).toBe("blocked"); if (why) expect(a.reason, l).toMatch(why); } };
+  const high = (lines: string[]) => { for (const l of lines) expect(assessLine(l).risk, l).toBe("high"); };
+
+  it("blocks write, wr and do write in every spelling and case: saving is a separate, explicit step", () => {
+    blocked(["write", "write memory", "write terminal", "wr", "wr mem", "wri", "writ", "Wr", "WR", "WRITE MEMORY", "Write Memory", "do write", "do wr", "DO WRITE", "Do Write Memory", "do   wr   mem", "  write memory  "], /separate, explicit step/);
+    expect(assessLine("do write").reason).toMatch(/saving is a separate, explicit step/);
+    expect(assessLine("write erase").risk).toBe("blocked");
+  });
+  it("does not block ordinary lines that merely start with or contain those letters", () => {
+    for (const l of ["wrr-queue bandwidth 10 20 30 40", "description write-protected uplink", "description do write nothing here", "interface GigabitEthernet0/1", "no shutdown"]) expect(assessLine(l).risk, l).toBe("normal");
+  });
+
+  it("blocks tclsh and tclquit, with a do prefix and in any case", () => {
+    blocked(["tclsh", "tclquit", "TCLSH", "Tclquit", "do tclsh", "DO TCLQUIT", "do   tclsh"], /Tcl shell/);
+  });
+
+  it("blocks any line that runs CLI from inside a configuration", () => {
+    blocked([
+      'action 1.0 cli command "reload"', 'ACTION 2.0 CLI COMMAND "enable"', "Action 3.0 Cli Command show version", "action 4 cli", "ACTION label CLI",
+      "cli command show version", "action 1.0 reload", "ACTION 2 REBOOT",
+    ]);
+  });
+
+  it("marks event manager, kron and alias high risk (never applied by Autopilot), with do and no prefixes and any case", () => {
+    high([
+      "event manager applet WATCH", "Event Manager environment _x 1", "EVENT MANAGER APPLET Y authorization bypass", "event   manager applet Z", "no event manager applet WATCH", "do event manager run WATCH",
+      "kron occurrence NIGHTLY at 3:00 recurring", "Kron policy-list L", "KRON policy-list L", "no kron policy-list L",
+      "alias exec s show version", "ALIAS configure sx hostname", "Alias Exec x show ip route", "do alias", "no alias exec s",
+    ]);
+  });
+
+  it("applies the same rules to the lines of a whole change", () => {
+    const lines = ["interface Gi0/1", "description ok", "do write", "tclsh", "alias exec s show version", 'action 1.0 cli command "reload"'];
+    expect(blockedLines(lines).map((a) => a.line)).toEqual(["do write", "tclsh", 'action 1.0 cli command "reload"']);
+  });
+
+  it("leaves Junos alone: its set and delete lines are judged by Junos rules", () => {
+    expect(assessLine("set system ntp server 10.0.0.9", "junos").risk).toBe("normal");
+    expect(assessLine("delete interfaces ge-0/0/1 disable", "junos").risk).toBe("normal");
+    expect(assessLine("write memory", "junos").risk).toBe("blocked"); // not a set or delete line
+  });
+});
+
 describe("EOS parsers (documented sample output, not a real device)", () => {
   it("reads show ip interface brief", () => {
     const rows = parseEosIpIntBrief(`                                                                    Address

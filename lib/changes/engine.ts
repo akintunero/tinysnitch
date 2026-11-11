@@ -123,7 +123,26 @@ export function rejectChange(id: string): Change {
   return updateChange(ctx.db, id, { status: "rejected" });
 }
 
-const busy = new Set<string>();
+/**
+ * One change at a time per network. Each holder gets its own token, and its release frees the lock only if that token
+ * still holds it: a run that was abandoned (a timeout, say) and finishes late cannot free the lock a newer run took.
+ */
+const busy = new Map<string, symbol>();
+
+export function acquireNetworkLock(scopeId: string): () => void {
+  const token = Symbol(scopeId);
+  busy.set(scopeId, token);
+  return () => {
+    if (busy.get(scopeId) === token) busy.delete(scopeId);
+  };
+}
+
+export const isNetworkBusy = (scopeId: string) => busy.has(scopeId);
+
+/** Clears every lock. For tests, so one that times out or aborts cannot leave a lock that fails the next. */
+export function resetChangeLocks(): void {
+  busy.clear();
+}
 
 type Env = { db: Db; provider: InventoryProvider; transport: DeviceTransport; nodes: Map<string, TopoNode> };
 
@@ -191,7 +210,6 @@ export async function deployChange(id: string): Promise<Change> {
   const ctx = getContext();
   const c0 = assertDeployable(id);
   const mode = modeOf(ctx.db);
-  busy.add(c0.scopeId);
   const result: ChangeResult = { startedAt: new Date().toISOString(), finishedAt: null, summary: "", devices: [], regressions: [], saved: false };
   const outcomes = new Map<string, DeviceOutcome>(c0.plan.devices.map((d) => [d.label, emptyOutcome(d.label)]));
   const finish = (status: Change["status"], summary: string, snapshot?: Record<string, string>) => {
@@ -201,6 +219,8 @@ export async function deployChange(id: string): Promise<Change> {
     addAudit(ctx.db, { kind: "configuration", actor: "system", summary: `Change "${c0.title}": ${status}. ${summary}`.slice(0, 480), data: { changeId: id, status, environment: c0.environment } });
     return updateChange(ctx.db, id, { status, result, ...(snapshot ? { snapshot } : {}) });
   };
+  // Taken straight before the try, with nothing in between that could throw, so it is always released in the finally.
+  const release = acquireNetworkLock(c0.scopeId);
   try {
     updateChange(ctx.db, id, { status: "deploying" });
     addAudit(ctx.db, { kind: "configuration", actor: "system", summary: `Deploying change "${c0.title}" to ${c0.plan.devices.length} device(s)`, data: { changeId: id } });
@@ -288,7 +308,7 @@ export async function deployChange(id: string): Promise<Change> {
   } catch (e) {
     return finish("failed", `The deployment stopped unexpectedly: ${e instanceof Error ? e.message.slice(0, 160) : "unknown error"}. Check each device before trying again.`);
   } finally {
-    busy.delete(c0.scopeId);
+    release();
   }
 }
 
@@ -307,7 +327,7 @@ export function assertRollbackable(id: string): Change {
 export async function rollbackChange(id: string): Promise<Change> {
   const ctx = getContext();
   const c = assertRollbackable(id);
-  busy.add(c.scopeId);
+  const release = acquireNetworkLock(c.scopeId);
   try {
     updateChange(ctx.db, id, { status: "rolling_back" });
     const env = await resolveEnv(c);
@@ -320,7 +340,7 @@ export async function rollbackChange(id: string): Promise<Change> {
   } catch (e) {
     return updateChange(ctx.db, id, { status: "rollback_failed", result: { ...(c.result ?? { startedAt: new Date().toISOString(), regressions: [], saved: false, devices: [] }), finishedAt: new Date().toISOString(), summary: `The rollback stopped unexpectedly: ${e instanceof Error ? e.message.slice(0, 160) : "unknown error"}. Check each device.`, devices: c.result?.devices ?? [] } });
   } finally {
-    busy.delete(c.scopeId);
+    release();
   }
 }
 
