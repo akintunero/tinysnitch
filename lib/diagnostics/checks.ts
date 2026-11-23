@@ -312,7 +312,7 @@ export function analyse(topology: Topology, snapshots: Map<string, DeviceSnapsho
   for (const [id, snap] of snapshots) {
     const d = devs.get(id);
     if (!d || (d.node.platform ?? "ios") !== "ios") continue;
-    extra.push({ node: d.node, configText: usable(snap, "config"), cfg: d.cfg, brief: d.brief, stpText: ran(snap, "stp"), bgpText: usable(snap, "bgp") });
+    extra.push({ node: d.node, configText: usable(snap, "config"), cfg: d.cfg, brief: d.brief, stpText: ran(snap, "stp"), bgpText: usable(snap, "bgp"), isisText: usable(snap, "isis") });
   }
   findings.push(...extraFindings(extra, topology.links, mk, { compliance: opts.compliance ?? false }));
 

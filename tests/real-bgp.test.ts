@@ -59,6 +59,12 @@ describe.skipIf(!ready)("the checks, run on the whole real lab", () => {
     expect(f!.fix).toEqual({ summary: "Set neighbor 10.0.15.2 to remote-as 65200 on London", note: expect.stringContaining("If Hamburg is the one with the wrong AS"), commands: ["router bgp 65100", "neighbor 10.0.15.2 remote-as 65200"] });
   });
 
+  it("also finds the route-filter findings when the whole engine runs, not only when the check is called directly", () => {
+    const kinds = result.findings.map((x) => `${x.device}:${x.kind}`);
+    expect(kinds).toContain("Cornwall:route-filter-blocks-prefixes");
+    expect(kinds).toContain("Paris:route-filter-name-misleading");
+  });
+
   it("raises it once, and does not blame the healthy sessions", () => {
     expect(result.findings.filter((x) => x.kind === "bgp-as-mismatch")).toHaveLength(1);
     expect(result.findings.filter((x) => x.kind === "bgp-peer-down").every((x) => ["London", "Hamburg"].includes(x.device))).toBe(true);

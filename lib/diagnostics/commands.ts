@@ -10,11 +10,12 @@ export const CMD = {
   trunk: "show interfaces trunk",
   etherchannel: "show etherchannel summary",
   stp: "show spanning-tree",
+  isis: "show isis neighbors",
 } as const;
 
 export type CommandKey = keyof typeof CMD;
 
-const ROUTING: CommandKey[] = ["brief", "config", "ospf", "bgp"];
+const ROUTING: CommandKey[] = ["brief", "config", "ospf", "bgp", "isis"];
 const SWITCHING: CommandKey[] = ["vlan", "trunk", "etherchannel", "stp"];
 
 /** Device kinds Tiny Snitch knows how to interrogate over the IOS CLI, and what to ask each. */

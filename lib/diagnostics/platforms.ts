@@ -75,7 +75,7 @@ export function driverFor(platform: Platform | undefined): Driver | null {
 
 export const supportedPlatforms = (): Platform[] => Object.keys(DRIVERS) as Platform[];
 
-const ROUTING: CommandKey[] = ["brief", "config", "ospf", "bgp"];
+const ROUTING: CommandKey[] = ["brief", "config", "ospf", "bgp", "isis"];
 const SWITCHING: CommandKey[] = ["vlan", "trunk", "etherchannel"];
 
 /** The logical keys to collect for a device kind, narrowed to what the platform's driver can do. */

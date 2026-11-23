@@ -264,6 +264,15 @@ production networks only (it is noise on throwaway labs); change that in Setting
 spanning-tree design, host default gateways, traceroute paths and asymmetric reachability, and devices that are not routers or
 switches of a supported platform.
 
+## From a finding to a fix
+
+A few findings have exactly one correct answer, and for those the check states the lines that would clear it: a BGP neighbour set to the wrong AS (it names the AS the other router really runs),
+an interface shut at one end of a link while the other end is up, SSH not pinned to version 2, the HTTP server enabled, and Telnet allowed on the VTY lines. The finding shows those lines and a
+note on what to check first, and **Propose this fix** files them as an ordinary change on that device. Nothing is applied from there: a person approves and applies it, with the usual snapshot,
+verification and rollback. The finding then shows where each fix stands, a second fix is not filed over an open one, and if a verified fix leaves the finding open the page says so.
+Everything else gets no fix on purpose (a mask mismatch, a duplicate address, SNMP or NTP settings), because the right answer depends on a choice only a person can make. There is no automatic
+proposing in Autopilot mode. API: `POST /api/v1/findings/{id}/fix`. Not yet tried on a real network's live findings; it is covered by tests and was exercised in the interface on a seeded finding.
+
 ## Backups and drift
 
 **Back up now**, or switch a network on for scheduled backups and diagnostics (Settings or the Backups page; read-only; skipped while a change is being applied). Each router's and switch's
@@ -293,8 +302,13 @@ Stated plainly, so nothing is assumed:
   paths (a device rejecting a line, partial application) are covered by tests against fake devices, not by a real node.
   Nothing was saved to startup.
 - **Verified on a real IOL-XE lab (IS-IS plus iBGP/eBGP, built with faults on purpose):** the BGP parser and the check that finds a peer set to the wrong AS, on output captured from all five routers
-  (`tests/fixtures/captured-iolxe`). The engine finds that fault and names its cause, with no false findings on interfaces. It does **not** check IS-IS, route filters or prefix counts, so
-  the lab's other faults, if it has any, are not found.
+  (`tests/fixtures/captured-iolxe`). The engine finds that fault and names its cause, with no false findings on interfaces. IS-IS is checked too (below). Route filters and prefix counts are checked as well: an inbound prefix-list that
+  denies some of the prefixes a neighbour's AS originates (and whether the received count equals expected minus denied), a prefix-list or route-map that is used but not defined, a received count that falls short
+  with nothing in the configuration to explain it (reported as suspected only), and a list named like a block list that only permits. On the captured lab these find Cornwall's filter (8 of 42) and the Paris list name.
+- **Verified on the real IOL-XE lab, IS-IS:** the neighbour parser and the interface reader, on `show isis neighbors` and the running configuration captured from all five routers, and a live run on the
+  lab (every router answered, no findings, matching adjacencies that are all UP). The two IS-IS checks, a neighbour that is seen but not UP and a link where both ends run `ip router isis` and are up/up
+  but neither sees the other (with the circuit-type mismatch named when that is the cause), are tested on written-out output, because the lab has no broken IS-IS adjacency to capture. IOS only for now;
+  `show isis neighbors` is asked only of a router whose configuration has `router isis`.
 - **Verified on real captured IOS output:** the security baseline and the spanning-tree parser, on configurations and `show spanning-tree` captured from your lab's IOSv and IOSvL2 nodes. The ACL,
   static-route and spanning-tree *checks* are tested on written-out configurations, not captured ones, because the lab's devices have no ACLs, static routes or inconsistent ports to capture.
 - **Verified in a real browser:** the sign-in screen, setup, sign-out, wrong-password message and the Settings pages, on an isolated instance. Everything else in the new UI is covered by

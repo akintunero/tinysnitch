@@ -78,15 +78,21 @@ export async function runDiagnostics(scopeId: string, opts: { pings?: boolean } 
     await mapLimit(targets, 3, async ({ node, keys }) => {
       const driver = driverFor(node.platform)!;
       const commands: Record<string, CommandResult> = {};
-      for (const k of keys) commands[CMD[k]] = await exec(node, driver.commands[k]!);
+      const asked: typeof keys = [];
+      for (const k of keys) {
+        // A router that does not run IS-IS has nothing to answer, and a refused command is not a failure to read it.
+        if (k === "isis" && !/^router isis(\s|$)/m.test(commands[CMD.config]?.text ?? "")) continue;
+        commands[CMD[k]] = await exec(node, driver.commands[k]!);
+        asked.push(k);
+      }
       const failed = Object.values(commands).filter((c) => !c.ok).length;
       snapshots.set(node.id, { nodeId: node.id, label: node.label, kind: node.kind, commands });
       devices.push({
-        nodeId: node.id, label: node.label, kind: node.kind, inspected: failed < keys.length, commandsRun: keys.length, commandsFailed: failed,
+        nodeId: node.id, label: node.label, kind: node.kind, inspected: failed < asked.length, commandsRun: asked.length, commandsFailed: failed,
         // When nothing could be read, say why in the device's own terms (unreachable, login refused...) rather than a bare count.
-        reason: failed === keys.length ? `Every command failed. ${Object.values(commands)[0]?.text.split("\n")[0].slice(0, 160) ?? ""}`.trim() : null,
+        reason: failed === asked.length ? `Every command failed. ${Object.values(commands)[0]?.text.split("\n")[0].slice(0, 160) ?? ""}`.trim() : null,
       });
-      addAudit(ctx.db, { kind: "diagnostic", actor: "system", summary: `Read ${keys.length - failed} of ${keys.length} commands from ${node.label}`, data: { scopeId, device: node.label, via: transport.kind, failed: Object.entries(commands).filter(([, c]) => !c.ok).map(([c]) => c) } });
+      addAudit(ctx.db, { kind: "diagnostic", actor: "system", summary: `Read ${asked.length - failed} of ${asked.length} commands from ${node.label}`, data: { scopeId, device: node.label, via: transport.kind, failed: Object.entries(commands).filter(([, c]) => !c.ok).map(([c]) => c) } });
     });
 
     // Reachability between directly connected neighbours whose interfaces both report up/up.

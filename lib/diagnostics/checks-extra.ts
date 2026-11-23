@@ -5,6 +5,7 @@
  */
 import type { TopoLink, TopoNode } from "../cml/topology";
 import { type DeviceCfg, type IfBriefRow, normIf, parseBgpSummary } from "./parsers";
+import { bgpPolicyFindings } from "./checks-bgp";
 import type { Finding, Fix } from "./types";
 
 export type MakeFinding = (f: Omit<Finding, "id">) => Finding;
@@ -19,11 +20,46 @@ export type ExtraInput = {
   stpText: string | null;
   /** `show ip bgp summary` output, when BGP is running and the command was accepted. */
   bgpText?: string | null;
+  /** `show isis neighbors` output, when IS-IS is configured and the command was accepted. */
+  isisText?: string | null;
 };
 
 const ip4 = (s: string) => s.split(".").reduce((n, o) => n * 256 + Number(o), 0) >>> 0;
 const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
 const ev = (label: string, cmd: string, line: string) => `${label}# ${cmd}: ${line.trim()}`;
+
+// ---- IS-IS ---------------------------------------------------------------------------------------------------
+export type IsisNeighbor = { systemId: string; type: string; interface: string; ip: string; state: string; raw: string };
+
+/** Rows of `show isis neighbors`: system id, level, interface, address, state, holdtime, circuit id. */
+export function parseIsisNeighbors(text: string): IsisNeighbor[] {
+  const out: IsisNeighbor[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const m = /^(\S+)\s+(L1L2|L1|L2|\S+)\s+(\S+)\s+(\d+\.\d+\.\d+\.\d+|\S+)\s+(UP|INIT|DOWN|Up|Init|Down)\s+\d+/.exec(line.trim());
+    if (m && /^(L1|L2|L1L2)$/.test(m[2])) out.push({ systemId: m[1], type: m[2], interface: normIf(m[3]), ip: m[4], state: m[5].toUpperCase(), raw: line.trim() });
+  }
+  return out;
+}
+
+/** The interfaces a configuration runs IS-IS on (`ip router isis`), with the circuit type each asks for. */
+export function isisInterfaces(config: string): { name: string; circuit: string | null }[] {
+  const out: { name: string; circuit: string | null }[] = [];
+  let cur: { name: string; isis: boolean; circuit: string | null } | null = null;
+  const flush = () => { if (cur?.isis) out.push({ name: cur.name, circuit: cur.circuit }); };
+  for (const raw of config.split(/\r?\n/)) {
+    const h = /^interface\s+(\S+)/.exec(raw);
+    if (h) { flush(); cur = { name: normIf(h[1]), isis: false, circuit: null }; continue; }
+    if (!cur) continue;
+    if (/^\S/.test(raw)) { flush(); cur = null; continue; }
+    if (/^\s+ip router isis(\s|$)/.test(raw)) cur.isis = true;
+    const c = /^\s+isis circuit-type\s+(level-1-2|level-1|level-2-only)/.exec(raw);
+    if (c) cur.circuit = c[1];
+  }
+  flush();
+  return out;
+}
+
+const levelsOf = (c: string | null) => (c === "level-1" ? ["L1"] : c === "level-2-only" ? ["L2"] : ["L1", "L2"]);
 
 // ---- spanning tree --------------------------------------------------------------------------------------------
 export type StpPort = { name: string; role: string; state: string; inconsistent: string | null; raw: string };
@@ -246,6 +282,37 @@ export function extraFindings(inputs: ExtraInput[], links: TopoLink[], mk: MakeF
     }
   }
 
+  // IS-IS: a neighbour that is not UP, and a link that both ends run IS-IS on but where no adjacency formed.
+  const isisOf = new Map<string, { neighbors: IsisNeighbor[]; ifaces: { name: string; circuit: string | null }[] }>();
+  for (const i of inputs) if (i.isisText?.trim() && i.configText) isisOf.set(i.node.id, { neighbors: parseIsisNeighbors(i.isisText), ifaces: isisInterfaces(i.configText) });
+  const ISIS = "show isis neighbors";
+  for (const i of inputs) {
+    for (const n of isisOf.get(i.node.id)?.neighbors ?? []) {
+      if (n.state === "UP") continue;
+      out.push(mk({ ...base(i), interface: n.interface, kind: "isis-neighbor-not-up", severity: "warning", status: "confirmed", title: `IS-IS neighbour ${n.systemId} on ${n.interface} is ${n.state}`,
+        description: `${i.node.label} sees ${n.systemId} on ${n.interface} but the adjacency is ${n.state}, not UP, so no routes are exchanged over it.`, evidence: [ev(i.node.label, ISIS, n.raw)],
+        probableCause: "The two ends disagree on something the adjacency needs (circuit type, area, authentication, MTU), or the link is dropping packets.", recommendedAction: `Compare the IS-IS interface and process settings on ${i.node.label} and ${n.systemId}.`, verification: `Confirmed from ${ISIS} on ${i.node.label}.` }));
+    }
+  }
+  for (const l of links) {
+    const a = byId.get(l.source), b = byId.get(l.target);
+    const ia = a && isisOf.get(a.node.id), ib = b && isisOf.get(b.node.id);
+    if (!a || !b || !ia || !ib) continue;
+    const an = normIf(l.sourceInterface), bn = normIf(l.targetInterface);
+    const ca = ia.ifaces.find((x) => x.name === an), cb = ib.ifaces.find((x) => x.name === bn);
+    if (!ca || !cb) continue; // IS-IS is not run on both ends: nothing is expected
+    const up = (i: ExtraInput, n: string) => { const r = i.brief?.get(n); return !!r && r.status === "up" && r.protocol === "up"; };
+    if (!up(a, an) || !up(b, bn)) continue; // the interface findings already say why
+    const seen = (side: { neighbors: IsisNeighbor[] }, n: string) => side.neighbors.some((x) => x.interface === n);
+    if (seen(ia, an) || seen(ib, bn)) continue;
+    const shared = levelsOf(ca.circuit).filter((x) => levelsOf(cb.circuit).includes(x));
+    const cause = !shared.length ? `The circuit types do not overlap: ${a.node.label} asks for ${ca.circuit}, ${b.node.label} for ${cb.circuit}, so they can never form an adjacency.` : "Both interfaces are up and run IS-IS, so something the adjacency needs differs: area, authentication, MTU or the process on one side.";
+    out.push(mk({ ...base(a), interface: an, peer: { device: b.node.label, deviceId: b.node.id, interface: bn }, linkId: l.id, kind: "isis-adjacency-missing", severity: "critical", status: "confirmed", title: "IS-IS adjacency missing",
+      description: `${a.node.label} ${an} and ${b.node.label} ${bn} are cabled together, both up/up and both configured with 'ip router isis', but neither lists the other as an IS-IS neighbour.`,
+      evidence: [ev(a.node.label, ISIS, `no neighbour on ${an}`), ev(b.node.label, ISIS, `no neighbour on ${bn}`), ...(ca.circuit ? [ev(a.node.label, CFG, `${an}: isis circuit-type ${ca.circuit}`)] : []), ...(cb.circuit ? [ev(b.node.label, CFG, `${bn}: isis circuit-type ${cb.circuit}`)] : [])],
+      probableCause: cause, recommendedAction: `On both routers compare 'show isis neighbors detail', the 'net' address (area), 'is-type', any IS-IS authentication and the interface MTU.`, verification: `Confirmed from ${ISIS} on both routers and the interface configuration.` }));
+  }
+
   // BGP: a peer that is not established because the AS configured for it is not the AS the other router runs. The cause is
   // only claimed when the router that owns the peer's address was also read, so both ASes are shown from device output.
   const localAs = (t: string | null | undefined) => t?.match(/local AS number (\d+(?:\.\d+)?)/i)?.[1] ?? null;
@@ -328,5 +395,6 @@ export function extraFindings(inputs: ExtraInput[], links: TopoLink[], mk: MakeF
       }
     }
   }
+  out.push(...bgpPolicyFindings(inputs.map((i) => ({ node: i.node, configText: i.configText, bgpText: i.bgpText, brief: i.brief })), mk));
   return out;
 }
