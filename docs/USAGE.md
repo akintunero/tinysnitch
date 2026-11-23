@@ -255,7 +255,8 @@ Suppose you have **5 routers and 10 switches** in one network and want them mana
    (hostname, interface addresses). There is no per-device value inside a single service yet.
 9. **Try one harmless change first** (an interface description) and watch the full cycle: approve, snapshot, verify, roll back.
 10. **Go live.** Add the remaining devices, run Diagnostics and a backup again, then change the site to `environment: production`.
-    From then on every change needs approval, runs staged (canary first) and respects the maintenance window.
+    From then on every change needs approval, runs staged (canary first) and respects the maintenance window. Each device must also be
+    **ready to go live** (section 6.6): back it up, review any drift, and have an approver sign it off on the Backups page.
 
 Diagnostics and backups read **every device in the network at once** (three devices at a time). Changes only ever touch the devices
 you choose.
@@ -378,6 +379,24 @@ configurations are not read.
   never finished if it was touching that device.
 - Versions are masked for secrets before storage; the newest 100 per device are kept. Deleting a stored version asks first.
 
+### 6.6 Ready to go live, device by device
+
+On a **production** network a device may only be changed once it is ready. The **Ready to go live** panel on the Backups page checks each
+device on its own:
+
+| Check | Passes when |
+|---|---|
+| Tiny Snitch can read it | the connection and credentials work right now |
+| Tiny Snitch can configure it | its platform and transport support configuration changes |
+| Has a recent backup | the last stored configuration is at most 7 days old (rollback goes back to it) |
+| No unreviewed changes made outside Tiny Snitch | no unacknowledged drift for the device |
+| A person has signed it off | an approver clicked **Sign off as ready** |
+
+An approver can sign a device off only when the other four checks pass, and can withdraw the sign-off at any time. A change that touches
+a device that is not ready is **refused when it is proposed, and checked again when it is applied**, so a device that drifts or loses
+its sign-off in between stops the change before anything is touched. Labs are never held to it, and an administrator can switch the gate
+off under Settings, Changes. Sign-offs and withdrawals are recorded in Activity.
+
 ---
 
 ## 7. Settings
@@ -441,6 +460,9 @@ Masking is a strong reduction in what is exposed, not a guarantee of anonymity: 
 structure, and identifying text in places it does not recognise are not masked. Add customer or site names to "Words to always hide".
 Diagnostics, backups, drift and the change workflow do not use Claude at all, so leaving the assistant unconfigured is a fully
 supported mode.
+
+The assistant page says, above the message box, whether the selected network is being pseudonymised, and warns in amber when it is not.
+The real-to-stand-in mapping is held in the server's memory only and is never sent anywhere.
 
 The assistant cannot change a device. It can file a change *proposal*, which a person still approves.
 

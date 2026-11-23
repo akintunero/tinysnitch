@@ -26,6 +26,8 @@ export const settingsSchema = z.object({
   llmSafeWords: z.array(z.string().trim().min(1).max(32)).max(200).default([]),
   /** On a production network the person who proposed a change cannot be the one who approves it (when someone else can). */
   requireSecondApprover: z.boolean().default(true),
+  /** On a production network a device must pass its readiness checks and be signed off before a change may touch it. */
+  requireDeviceReadiness: z.boolean().default(true),
   /** When a change may be applied to a production network. Labs are never held to it. */
   maintenanceWindow: maintenanceWindowSchema.default(maintenanceWindowSchema.parse({})),
   /** Networks that are backed up and checked on a schedule. Empty means nothing runs by itself. */
@@ -54,6 +56,7 @@ export const settingsPatchSchema = z
     llmPrivateTerms: z.array(z.string().trim().min(2).max(64)).max(100).optional(),
     llmSafeWords: z.array(z.string().trim().min(1).max(32)).max(200).optional(),
     requireSecondApprover: z.boolean().optional(),
+    requireDeviceReadiness: z.boolean().optional(),
     maintenanceWindow: maintenanceWindowSchema.optional(),
     monitoredScopes: z.array(z.string().max(120)).max(50).optional(),
     backupIntervalMinutes: z.number().int().min(0).max(10080).optional(),

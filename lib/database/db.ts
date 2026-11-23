@@ -145,6 +145,13 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX finding_fixes_scope ON finding_fixes(scope_id, created_at);
   `,
+  `
+  -- A person's statement that one device is ready to go live. The device's other readiness checks are worked out each time.
+  CREATE TABLE device_readiness (
+    scope_id TEXT NOT NULL, device TEXT NOT NULL, signed_by TEXT NOT NULL, signed_at TEXT NOT NULL, note TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (scope_id, device)
+  );
+  `,
 ];
 
 export function resolveDatabasePath(url: string | undefined, cwd = process.cwd()): string {

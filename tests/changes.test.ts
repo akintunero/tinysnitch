@@ -90,7 +90,7 @@ describe("the change workflow against devices that hold real configuration", () 
     const file = join(mkdtempSync(join(tmpdir(), "ts-chg-")), "inv.yaml");
     writeFileSync(file, `credentials:\n  c: { username: admin, password: env:TS_TEST_PW }\nsites:\n  - id: site\n    title: Site\n    environment: ${env}\n    credential: c\n    devices:\n      - { name: R1, address: 127.0.0.1, port: ${r1.port}, platform: ios }\n      - { name: R2, address: 127.0.0.1, port: ${r2.port}, platform: ios }\n    links:\n      - { a: R1, aInterface: Gi0/0, b: R2, bInterface: Gi0/0 }\n`);
     const db = openDatabase(":memory:");
-    saveSettings(db, { executionMode: over.mode ?? "approve", autopilotAllowConfig: true });
+    saveSettings(db, { executionMode: over.mode ?? "approve", autopilotAllowConfig: true, requireDeviceReadiness: false });
     setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "no cml", claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null }, anthropic: null, lastConnectAttempt: 0 });
     setProviders([new StaticProvider(file)]);
     return db;

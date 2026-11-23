@@ -27,6 +27,24 @@ const recall = () => { try { return localStorage.getItem(KEY); } catch { return 
 
 const fromStored =(m: StoredMessage): UiMessage => ({ key: `s${m.id}`, role: m.role, parts: m.parts, error: m.error, streaming: false });
 
+/** Whether what is sent to Claude is masked for a network. Mirrors the server: an unknown environment counts as production. */
+export const isMasked = (mode: string, environment: string | null) => mode === "all" || (mode === "production" && environment !== "lab");
+
+/** Says, where the question is typed, what leaves this server and what does not. */
+function PrivacyNotice({ mode, environment }: { mode: string; environment: string | null }) {
+  const masked = isMasked(mode, environment);
+  return (
+    <p className={`mt-3 border-l-2 pl-2.5 text-[12px] ${masked ? "border-line text-soft" : "border-warn text-warn"}`} data-testid="privacy-notice">
+      {masked ? (
+        <><strong className="font-semibold text-ink">Your network data is pseudonymised before it reaches Claude.</strong> Addresses, device and network names, MAC addresses, public AS numbers, descriptions and banners are swapped for stand-ins, and passwords and keys are removed. The real values are put back here; the mapping never leaves this server. Names no one declared can slip through, so add customer and site names under{" "}</>
+      ) : (
+        <><strong className="font-semibold">Not masked for this network: Claude sees real addresses and names.</strong> Passwords and keys are still removed. To hide the rest, change it under{" "}</>
+      )}
+      <a href="/settings#privacy" className="underline underline-offset-2">Settings, Privacy</a>.
+    </p>
+  );
+}
+
 export function ChatView() {
   const { settings, labs } = useApp();
   const [messages, setMessages] = useState<UiMessage[]>([]);
@@ -233,6 +251,7 @@ export function ChatView() {
       </div>
 
       {problem ? <p role="alert" className="mt-2 text-[13px] text-bad">{problem}</p> : null}
+      {settings ? <PrivacyNotice mode={settings.llmPrivacy} environment={labs.labs.find((l) => l.id === settings.selectedLabId)?.environment ?? null} /> : null}
       <form className="mt-3 flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); void send(); }}>
         <label className="sr-only" htmlFor="assistant-input">Message</label>
         <textarea id="assistant-input" ref={inputRef} rows={2} value={input} maxLength={4000} onChange={(e) => setInput(e.target.value)} placeholder="Ask about the network, a device, or a problem"

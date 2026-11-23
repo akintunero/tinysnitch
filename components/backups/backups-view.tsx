@@ -9,6 +9,7 @@ import type { Diff } from "@/lib/backup/diff";
 import type { Backup, BackupMeta, DriftEvent } from "@/lib/backup/store";
 import { ClientError, apiGet, apiSend } from "@/lib/client";
 import { cn, relativeTime } from "@/lib/utils";
+import { ReadinessPanel } from "./readiness-panel";
 
 type Overview = {
   scopeId: string; devices: { device: string; latest: BackupMeta; versions: number }[]; drift: DriftEvent[];
@@ -90,6 +91,8 @@ export function BackupsView() {
           <label>Diagnostics <select className="ml-1 h-7 rounded-sm border border-line bg-bg px-2" value={settings?.diagnosticsIntervalMinutes ?? 0} onChange={(e) => void updateSettings({ diagnosticsIntervalMinutes: Number(e.target.value) })}>{INTERVALS.map((i) => <option key={i.v} value={i.v}>{i.l}</option>)}</select></label>
         </div>
       </section>
+
+      <ReadinessPanel scopeId={scopeId} reloadKey={data} />
 
       {data && data.drift.length ? (
         <section aria-label="Drift" className="mb-6">

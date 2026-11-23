@@ -116,6 +116,8 @@ a host pattern (`all`, or containing `:` `,` `!` `&` `*` or spaces) are refused.
    (or roll back), so a bad change reaches one device, not all of them. A change can be applied at once, or scheduled for a time.
    **Maintenance window:** a production change is only applied inside the window set in Settings; outside it, an administrator can apply it anyway with
    a reason, which is recorded. Labs are never held to it.
+   **Go-live gate:** on production, each device a change touches must be *ready*: readable, configurable, backed up in the last 7 days, free of unreviewed
+   drift, and signed off by an approver. The check runs when the change is proposed and again just before it is applied.
 6. **Verify.** Each device is read back and every line must show in the running configuration (on Junos, in `show configuration | display set`).
    On Junos the change is only made permanent after this check passes; if it does not, the device reverts it on its own. Diagnostics are re-run and
    any new problem is listed. A line the device accepted but did not apply is reported as unverified, not as success.

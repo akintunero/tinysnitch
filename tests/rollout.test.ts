@@ -73,7 +73,7 @@ async function boot(o: { env?: "lab" | "production"; mode?: "approve" | "autopil
   const file = join(mkdtempSync(join(tmpdir(), "ts-ro-")), "inv.yaml");
   writeFileSync(file, `credentials:\n  c: { username: admin, password: env:TS_TEST_PW }\nsites:\n  - id: s\n    title: S\n    environment: ${o.env ?? "lab"}\n    credential: c\n    devices:\n      - { name: R1, address: 127.0.0.1, port: ${r1.port}, platform: ios, kind: router }\n      - { name: R2, address: 127.0.0.1, port: ${r2.port}, platform: ios, kind: router }\n`);
   const db = openDatabase(":memory:");
-  saveSettings(db, { executionMode: o.mode ?? "approve", autopilotAllowConfig: true, maintenanceWindow: o.window ?? win() });
+  saveSettings(db, { executionMode: o.mode ?? "approve", autopilotAllowConfig: true, requireDeviceReadiness: false, maintenanceWindow: o.window ?? win() });
   setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "no cml", claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null }, anthropic: null, lastConnectAttempt: 0 });
   setProviders([new StaticProvider(file)]);
   return db;

@@ -7,6 +7,7 @@ import { runDiagnostics } from "../diagnostics/engine";
 import { driverFor } from "../diagnostics/platforms";
 import { openFindings } from "../diagnostics/store";
 import { providerFor } from "../providers/registry";
+import { checkDevices, describeNotReady } from "../readiness";
 import { getContext } from "../server/context";
 import { CLI } from "../transport/ssh";
 import { countUsers, otherApprovers } from "../auth/store";
@@ -103,6 +104,11 @@ export async function proposeChange(input: { scopeId: string; title: string; int
   const topology = await provider.getTopology(input.scopeId);
   const v = validatePlan(topology.nodes, provider, input.devices, provider.transport(input.scopeId));
   const environment: Environment = topology.lab.environment ?? "lab";
+  if (environment === "production" && getSettings(ctx.db).requireDeviceReadiness) {
+    const touched = topology.nodes.filter((n) => v.devices.some((d) => d.deviceId === n.id));
+    const notReady = checkDevices(ctx.db, input.scopeId, touched, provider, provider.transport(input.scopeId)).filter((d) => !d.ready);
+    if (notReady.length) throw new ChangeError(describeNotReady(notReady), 409);
+  }
   // Several devices in production go canary-first unless the proposer chose otherwise.
   let rollout: Rollout | undefined = input.rollout;
   if (rollout?.mode === "staged" && v.devices.length < 2) throw new ChangeError("A staged rollout needs at least two devices.", 400);
@@ -304,6 +310,17 @@ async function execute(id: string, phase: "start" | "continue", override?: Overr
     updateChange(ctx.db, id, { status: "deploying", scheduledFor: null });
     addAudit(ctx.db, { kind: "configuration", actor: "system", summary: `${phase === "continue" ? "Continuing" : "Deploying"} change "${c0.title}" to ${(phase === "continue" ? rest : all).length} device(s)${ro.staged ? " (staged)" : ""}`, data: { changeId: id } });
     const env = await resolveEnv(c0);
+
+    // 0. A device that stopped being ready since the change was proposed (it drifted, its backup went stale, its sign-off was
+    //    withdrawn) stops the change before anything is touched.
+    if (phase === "start" && c0.environment === "production" && getSettings(ctx.db).requireDeviceReadiness) {
+      const nodes = all.map((d) => env.nodes.get(d.deviceId)).filter((n): n is TopoNode => !!n);
+      const notReady = checkDevices(ctx.db, c0.scopeId, nodes, env.provider, env.transport).filter((d) => !d.ready);
+      if (notReady.length) {
+        for (const r of notReady) outcomes.get(r.device)?.steps.push(`Not ready to go live: ${r.checks.find((c) => !c.ok)!.detail}`);
+        return finish("failed", `Refused to apply: ${describeNotReady(notReady)} Nothing was changed.`);
+      }
+    }
 
     // 1. Snapshot before touching anything. On a continue, the devices still to be changed are read again, because they
     //    may have changed since the canary was applied; the canary's own snapshot is kept.
