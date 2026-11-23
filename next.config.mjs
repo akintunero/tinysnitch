@@ -4,6 +4,10 @@ export default {
   // These talk to child processes and sockets; keep them out of the bundle.
   serverExternalPackages: ["@modelcontextprotocol/sdk", "@anthropic-ai/sdk", "ajv"],
   poweredByHeader: false,
+  // The Networks page used to live at /labs; keep old bookmarks working.
+  async redirects() {
+    return [{ source: "/labs", destination: "/networks", permanent: false }];
+  },
   async headers() {
     return [
       {

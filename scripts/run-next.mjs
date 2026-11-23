@@ -1,4 +1,4 @@
-// Runs `next dev` or `next start` bound to loopback on APP_PORT (default 3000), reading .env.local first.
+// Runs `next dev` or `next start` on APP_HOST:APP_PORT (default 127.0.0.1:3000), reading .env.local first.
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 
@@ -9,8 +9,23 @@ if (!["dev", "start"].includes(mode)) {
 }
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 const port = process.env.APP_PORT || "3000";
+const host = (process.env.APP_HOST || "127.0.0.1").trim();
 const bin = new URL("../node_modules/next/dist/bin/next", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
-const child = spawn(process.execPath, [decodeURIComponent(bin), mode, "-H", "127.0.0.1", "-p", port], { stdio: "inherit", env: process.env });
+const args = [decodeURIComponent(bin), mode, "-H", host, "-p", port];
+
+// The app has no login. Listening beyond loopback is meant for a container whose port is published to the host's
+// loopback only; anywhere else it would put an unauthenticated network tool on the network.
+if (!/^(127\.\d+\.\d+\.\d+|localhost|::1)$/i.test(host)) {
+  console.error(`Warning: listening on ${host}. Tiny Snitch has no login; publish the port to 127.0.0.1 only and keep it off untrusted networks.`);
+}
+
+// Lets a test check the arguments without starting a server.
+if (process.env.RUN_NEXT_DRY === "1") {
+  console.log(JSON.stringify({ host, port, mode }));
+  process.exit(0);
+}
+
+const child = spawn(process.execPath, args, { stdio: "inherit", env: process.env });
 child.on("exit", (code) => process.exit(code ?? 0));
 // Pass a stop request on to Next, which closes the MCP child before it exits.
 for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => child.kill(sig));

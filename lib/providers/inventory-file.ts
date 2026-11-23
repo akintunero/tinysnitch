@@ -97,6 +97,11 @@ export function parseInventory(text: string): Inventory {
   } catch (e) {
     throw new InventoryError(`The inventory is not valid YAML or JSON: ${e instanceof Error ? e.message.split("\n")[0] : "parse error"}`);
   }
+  return validateInventory(raw);
+}
+
+/** Validates an inventory that is already parsed (a YAML file, or one built from an Ansible inventory), then cross-checks it. */
+export function validateInventory(raw: unknown): Inventory {
   const r = inventorySchema.safeParse(raw);
   if (!r.success) {
     const i = r.error.issues[0];

@@ -12,6 +12,7 @@ export const GET = route(async () => {
     configured: {
       cml: providers.some((p) => p.kind === "cml"),
       inventoryFile: Boolean(process.env.TS_INVENTORY_FILE?.trim()),
+      ansible: Boolean(process.env.TS_ANSIBLE_INVENTORY?.trim()),
       netbox: Boolean(process.env.NETBOX_URL?.trim()),
     },
   });

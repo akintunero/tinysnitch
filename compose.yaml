@@ -1,0 +1,43 @@
+# docker compose up --build
+# Open http://localhost:3000. The port is published to this machine's loopback only: Tiny Snitch has no login,
+# so do not change "127.0.0.1" to "0.0.0.0" or put it behind a public proxy.
+#
+# Configuration comes from .env.local (same file as running it natively), plus optional mounts below.
+# In .env.local, write ${VAR} references as {{VAR}} (see .env.example); that works here too.
+
+services:
+  tiny-snitch:
+    build:
+      context: .
+      args:
+        MCP_REMOTE_VERSION: ${MCP_REMOTE_VERSION:-latest}
+    image: tiny-snitch:local
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    env_file:
+      - path: .env.local
+        required: false
+    environment:
+      APP_HOST: 0.0.0.0        # inside the container; the published port above is what limits access
+      APP_PORT: "3000"
+      DATABASE_URL: file:/app/data/tiny-snitch.db
+    volumes:
+      - tiny-snitch-data:/app/data
+      # Real devices: mount your inventory read-only and point at it. Passwords stay in env vars or secrets.
+      # - ./inventory.yaml:/app/inventory.yaml:ro
+      # Ansible inventory instead of (or as well as) the file above:
+      # - ./ansible/inventory.yml:/app/ansible-inventory.yml:ro
+    # secrets:
+    #   - ssh_password          # then use  password: file:/run/secrets/ssh_password  in the inventory
+    read_only: false           # Next.js writes a small cache under .next at run time
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  tiny-snitch-data:
+
+# secrets:
+#   ssh_password:
+#     file: ./secrets/ssh_password.txt

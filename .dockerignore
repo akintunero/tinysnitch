@@ -1,0 +1,24 @@
+# Secrets and local state never go into an image.
+.env
+.env.*
+!.env.example
+data
+inventory.yaml
+inventory.yml
+*.pem
+*.key
+
+# Build output and dependencies are produced inside the image.
+node_modules
+.next
+out
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# Not needed to build or run.
+.git
+.gitignore
+.dockerignore
+tests
+coverage
+*.log

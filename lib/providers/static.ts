@@ -2,7 +2,7 @@ import { statSync } from "node:fs";
 import { buildTopology } from "../cml/topology";
 import type { TopoLink, TopoNode, Topology } from "../cml/topology";
 import { cmlLinkStatus } from "../cml/topology";
-import type { DeviceRef, DeviceTransport, Inspectable, InventoryProvider, Scope } from "../core/types";
+import type { DeviceRef, DeviceTransport, Inspectable, InventoryProvider, ProviderKind, Scope } from "../core/types";
 import { hostKeyStore } from "../database/repo";
 import { getContext } from "../server/context";
 import { CompositeTransport } from "../transport/composite";
@@ -74,21 +74,31 @@ export function siteTopology(inv: Inventory, site: InventorySite, providerId: st
   return { ...t, nodes, links, warnings: site.links.length === 0 ? ["This site declares no links, so none are drawn. Run discovery to find them from CDP/LLDP neighbour tables."] : [] };
 }
 
-/** Devices and sites from a YAML/JSON file. Real gear, reached over SSH. */
-export class StaticProvider implements InventoryProvider {
-  readonly kind = "static" as const;
-  readonly label: string;
-  private cache: { mtimeMs: number; inv: Inventory } | null = null;
-  private transports = new Map<string, CompositeTransport>();
+/** A loaded inventory plus anything the loader wants the engineer to know (an Ansible import skips some hosts). */
+export type Loaded = { inventory: Inventory; warnings: string[] };
 
-  constructor(readonly path: string, readonly id = "static") {
-    this.label = `Inventory file`;
+/** Devices and sites from a YAML/JSON inventory file, or an Ansible inventory converted to one. Real gear, reached over SSH or an API. */
+export class StaticProvider implements InventoryProvider {
+  readonly kind: ProviderKind;
+  readonly label: string;
+  private cache: { mtimeMs: number; loaded: Loaded } | null = null;
+  private transports = new Map<string, CompositeTransport>();
+  private load: (path: string) => Loaded;
+
+  constructor(readonly path: string, readonly id = "static", opts: { kind?: ProviderKind; label?: string; load?: (path: string) => Loaded } = {}) {
+    this.kind = opts.kind ?? "static";
+    this.label = opts.label ?? "Inventory file";
+    this.load = opts.load ?? ((p) => ({ inventory: loadInventoryFile(p), warnings: [] }));
   }
 
   inventory(): Inventory {
+    return this.loaded().inventory;
+  }
+
+  private loaded(): Loaded {
     const mtimeMs = statSync(this.path).mtimeMs;
-    if (!this.cache || this.cache.mtimeMs !== mtimeMs) { this.cache = { mtimeMs, inv: loadInventoryFile(this.path) }; this.transports.clear(); }
-    return this.cache.inv;
+    if (!this.cache || this.cache.mtimeMs !== mtimeMs) { this.cache = { mtimeMs, loaded: this.load(this.path) }; this.transports.clear(); }
+    return this.cache.loaded;
   }
 
   private site(scopeId: string): { inv: Inventory; site: InventorySite } {
@@ -101,14 +111,15 @@ export class StaticProvider implements InventoryProvider {
 
   async listScopes(): Promise<Scope[]> {
     return this.inventory().sites.map((s) => ({
-      id: `${this.id}:${s.id}`, providerId: this.id, providerKind: "static" as const, title: s.title, state: "INVENTORY", environment: s.environment,
+      id: `${this.id}:${s.id}`, providerId: this.id, providerKind: this.kind, title: s.title, state: "INVENTORY", environment: s.environment,
       nodeCount: s.devices.length, linkCount: s.links.length, description: s.description ?? "", owner: null,
     }));
   }
 
   async getTopology(scopeId: string): Promise<Topology> {
     const { inv, site } = this.site(scopeId);
-    return siteTopology(inv, site, this.id);
+    const t = siteTopology(inv, site, this.id);
+    return { ...t, warnings: [...t.warnings, ...this.loaded().warnings] };
   }
 
   transport(scopeId: string): DeviceTransport {

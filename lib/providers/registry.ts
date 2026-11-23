@@ -3,6 +3,7 @@ import { splitScopeId } from "../core/types";
 import { getContext } from "../server/context";
 import { CmlProvider } from "./cml";
 import { DiscoveryProvider } from "./discovery";
+import { loadAnsibleInventory } from "./ansible-inventory";
 import { InventoryError, loadInventoryFile, type Inventory } from "./inventory-file";
 import { NetboxProvider, loadNetboxConfig } from "./netbox";
 import { StaticProvider } from "./static";
@@ -17,7 +18,7 @@ export function setProviders(p: InventoryProvider[] | null): void {
 }
 
 type FileProviders = { path: string; s: StaticProvider; d: DiscoveryProvider };
-const g = globalThis as unknown as { __tsFiles?: FileProviders; __tsNetbox?: { key: string; p: NetboxProvider } };
+const g = globalThis as unknown as { __tsFiles?: FileProviders; __tsAnsible?: { path: string; p: StaticProvider }; __tsNetbox?: { key: string; p: NetboxProvider } };
 
 export type ProviderProblem = { provider: string; message: string };
 export const providerProblems: ProviderProblem[] = [];
@@ -31,6 +32,14 @@ function fileProviders(): FileProviders | null {
     g.__tsFiles = { path, s, d: new DiscoveryProvider((): Inventory => s.inventory()) };
   }
   return g.__tsFiles;
+}
+
+/** An Ansible inventory, read through the same machinery as the inventory file. One long-lived provider per path. */
+function ansibleProvider(): StaticProvider | null {
+  const path = process.env.TS_ANSIBLE_INVENTORY?.trim();
+  if (!path) return null;
+  if (g.__tsAnsible?.path !== path) g.__tsAnsible = { path, p: new StaticProvider(path, "ansible", { kind: "ansible", label: "Ansible inventory", load: loadAnsibleInventory }) };
+  return g.__tsAnsible.p;
 }
 
 export function getProviders(): InventoryProvider[] {
@@ -48,6 +57,12 @@ export function getProviders(): InventoryProvider[] {
     }
   } catch (e) {
     providerProblems.push({ provider: "Inventory file", message: e instanceof InventoryError ? e.message : `The inventory file could not be used: ${e instanceof Error ? e.message : "unknown error"}` });
+  }
+  try {
+    const a = ansibleProvider();
+    if (a) { a.inventory(); out.push(a); } // validates now so a mistake is reported, not hidden
+  } catch (e) {
+    providerProblems.push({ provider: "Ansible inventory", message: e instanceof InventoryError ? e.message : `The Ansible inventory could not be used: ${e instanceof Error ? e.message : "unknown error"}` });
   }
   try {
     const cfg = loadNetboxConfig();

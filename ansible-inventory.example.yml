@@ -1,0 +1,25 @@
+# An Ansible inventory that Tiny Snitch can import. Point TS_ANSIBLE_INVENTORY at a copy of it (or at your own inventory).
+#
+# Each top-level group becomes a network. Passwords are NEVER read from an inventory: ansible_password and vault values
+# are ignored. Give a password as a reference, or set TS_ANSIBLE_PASSWORD once for all of them.
+all:
+  vars:
+    ansible_user: netops
+    ansible_connection: network_cli
+    # tiny_snitch_password: env:SSH_PASSWORD     # a reference, never the password itself
+  children:
+    london:
+      vars:
+        tiny_snitch_environment: production      # lab | production. Production if you leave it out.
+        tiny_snitch_links:                       # optional; Ansible has no links, so say them here or use discovery
+          - { a: lon-core1, aInterface: GigabitEthernet0/1, b: lon-sw1, bInterface: GigabitEthernet0/0 }
+      hosts:
+        lon-core1: { ansible_host: 10.10.0.1, ansible_network_os: cisco.ios.ios }
+        lon-sw1:   { ansible_host: 10.10.0.11, ansible_network_os: cisco.ios.ios, tiny_snitch_kind: l2switch }
+        lon-eos1:  { ansible_host: 10.10.0.31, ansible_network_os: arista.eos.eos, ansible_connection: ansible.netcommon.httpapi }
+        lon-jun1:  { ansible_host: 10.10.0.51, ansible_network_os: junipernetworks.junos.junos, ansible_connection: ansible.netcommon.netconf }
+    bench:
+      vars:
+        tiny_snitch_environment: lab
+      hosts:
+        bench-r1: { ansible_host: 192.168.1.1, ansible_network_os: ios }
