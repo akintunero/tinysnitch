@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ServicePanel, LinesView } from "@/components/changes/service-panel";
 import { useApp } from "@/components/layout/status-provider";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { apiGet, apiSend } from "@/lib/client";
 import type { Field } from "@/lib/provisioning/catalog";
 import type { HistoryEntry, ServiceInstance, ServiceStatus } from "@/lib/provisioning/instances";
 import type { ServiceExposure } from "@/lib/provisioning/impact";
+import type { Running } from "@/lib/provisioning/detect";
 import type { DeviceLines } from "@/lib/provisioning/lifecycle";
 import { cn, relativeTime } from "@/lib/utils";
 
@@ -26,6 +27,10 @@ const EXPLAIN: Record<ServiceStatus, string> = {
   inactive: "This was never applied to the devices. Retry it, or stop tracking it.",
   retired: "Taken away from the devices.",
 };
+const ORDER: Record<ServiceStatus, number> = { failed: 0, pending: 1, inactive: 2, active: 3, retired: 4 };
+type SortKey = "recent" | "name" | "status" | "type";
+const SORTS: { v: SortKey; l: string }[] = [{ v: "recent", l: "Recently changed" }, { v: "name", l: "Name" }, { v: "status", l: "Status (problems first)" }, { v: "type", l: "Type" }];
+const SELECT = "h-7 rounded-sm border border-line bg-bg px-2 text-[12px]";
 const OP: Record<string, string> = { provision: "Provision", modify: "Change", decommission: "Remove" };
 
 export function ServicesView() {
@@ -37,6 +42,10 @@ export function ServicesView() {
   const [exposure, setExposure] = useState<ServiceExposure[]>([]);
   const [retired, setRetired] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [onDevices, setOnDevices] = useState<{ device: string; takenAt: string; running: Running[] }[] | null>(null);
+  const [devicesOpen, setDevicesOpen] = useState(false);
+  const [devicesError, setDevicesError] = useState<string | null>(null);
+  const [startId, setStartId] = useState<string | null>(null);
   const [editing, setEditing] = useState<ServiceInstance | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
@@ -44,6 +53,29 @@ export function ServicesView() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ changeId: string; text: string } | null>(null);
+  const [q, setQ] = useState("");
+  const [statusF, setStatusF] = useState("");
+  const [typeF, setTypeF] = useState("");
+  const [deviceF, setDeviceF] = useState("");
+  const [riskOnly, setRiskOnly] = useState(false);
+  const [sort, setSort] = useState<SortKey>("recent");
+  const riskyIds = useMemo(() => new Set(exposure.filter((e) => e.risks.some((r) => r.severity !== "info")).map((e) => e.serviceId)), [exposure]);
+  const typesIn = useMemo(() => [...new Map((services ?? []).map((s) => [s.serviceId, s.title])).entries()].sort((a, b) => a[1].localeCompare(b[1])), [services]);
+  const devicesIn = useMemo(() => [...new Set((services ?? []).flatMap((s) => s.devices))].sort(), [services]);
+  const shown = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    const list = (services ?? []).filter((s) =>
+      (!statusF || s.status === statusF) && (!typeF || s.serviceId === typeF) && (!deviceF || s.devices.includes(deviceF)) && (!riskOnly || riskyIds.has(s.id)) &&
+      (!needle || [s.name, s.title, ...s.devices].some((t) => t.toLowerCase().includes(needle))));
+    const by: Record<SortKey, (a: ServiceInstance, b: ServiceInstance) => number> = {
+      recent: (a, b) => b.updatedAt.localeCompare(a.updatedAt),
+      name: (a, b) => a.name.localeCompare(b.name),
+      status: (a, b) => ORDER[a.status] - ORDER[b.status] || a.name.localeCompare(b.name),
+      type: (a, b) => a.title.localeCompare(b.title) || a.name.localeCompare(b.name),
+    };
+    return list.sort(by[sort]);
+  }, [services, q, statusF, typeF, deviceF, riskOnly, riskyIds, sort]);
+  const filtering = Boolean(q || statusF || typeF || deviceF || riskOnly);
 
   const load = useCallback(async () => {
     if (!scopeId) return;
@@ -59,6 +91,12 @@ export function ServicesView() {
   }, []);
 
   useEffect(() => { setServices(null); setOpenId(null); setDetail(null); void load(); }, [load]);
+  // Only read when the section is opened, and again when the network changes, so the page stays light.
+  useEffect(() => {
+    if (!devicesOpen || !scopeId) return;
+    setOnDevices(null); setDevicesError(null);
+    apiGet<{ devices: { device: string; takenAt: string; running: Running[] }[] }>(`/api/services/running?scope=${encodeURIComponent(scopeId)}`).then((r) => setOnDevices(r.devices)).catch((e) => setDevicesError((e as Error).message));
+  }, [devicesOpen, scopeId, services]);
   useEffect(() => { apiGet<{ services: CatalogEntry[] }>("/api/provisioning").then((r) => setCatalog(r.services)).catch(() => undefined); }, []);
   useEffect(() => { if (openId) void loadDetail(openId); else setDetail(null); }, [openId, loadDetail]);
   // A service follows its change, so while one is open the page keeps asking, and it catches up when you come back to the tab.
@@ -112,7 +150,7 @@ export function ServicesView() {
         </div>
         <div className="flex items-center gap-2">
           <label className="text-soft flex items-center gap-1.5 text-[12px]"><input type="checkbox" className="accent-accent" checked={retired} onChange={(e) => setRetired(e.target.checked)} />Show retired</label>
-          <Button variant="primary" disabled={!canAct} onClick={() => { setCreating((v) => !v); setEditing(null); }}>{creating ? "Close" : "New service"}</Button>
+          <Button variant="primary" disabled={!canAct} onClick={() => { setCreating((v) => !v); setStartId(null); setEditing(null); }}>{creating ? "Close" : "New service"}</Button>
         </div>
       </div>
 
@@ -124,17 +162,27 @@ export function ServicesView() {
       ) : null}
       {error ? <p role="alert" className="mb-3 text-[13px] text-bad">{error}</p> : null}
 
-      {creating ? <ServicePanel scopeId={scopeId} onDone={filed} onCancel={() => setCreating(false)} /> : null}
+      {creating ? <ServicePanel key={startId ?? "new"} scopeId={scopeId} initialServiceId={startId} onDone={filed} onCancel={() => setCreating(false)} /> : null}
       {editing ? <ServicePanel scopeId={scopeId} existing={editing} onDone={filed} onCancel={() => setEditing(null)} /> : null}
 
-      {services === null ? <p className="text-soft">Loading...</p> : services.length === 0 && !creating ? (
-        <EmptyState title="No services yet" action={canAct ? <Button onClick={() => setCreating(true)}>New service</Button> : undefined}>
+      {services === null ? <p className="text-soft">Loading...</p> : services.length === 0 ? (creating ? null : <EmptyState title="No services yet" action={canAct ? <Button onClick={() => { setStartId(null); setCreating(true); }}>New service</Button> : undefined}>
           A service is something you provision from a form, such as a VLAN, a routed interface or a BGP neighbour. Tiny Snitch remembers it, shows whether it is in place, and lets you change or remove it later through approved changes.
         </EmptyState>
       ) : (
         <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
-          <ul className="divide-y divide-line self-start rounded-md border border-line bg-surface" aria-label="Services">
-            {services.map((s) => (
+          <div className="self-start">
+          <div className="mb-2 flex flex-wrap items-center gap-2" role="search" aria-label="Filter and sort services">
+            <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, type or device" aria-label="Search services" className={cn(SELECT, "min-w-[10rem] flex-1")} />
+            <select aria-label="Status" className={SELECT} value={statusF} onChange={(e) => setStatusF(e.target.value)}><option value="">Any status</option>{(Object.keys(ORDER) as ServiceStatus[]).filter((st) => retired || st !== "retired").map((st) => <option key={st} value={st}>{st}</option>)}</select>
+            <select aria-label="Type" className={SELECT} value={typeF} onChange={(e) => setTypeF(e.target.value)}><option value="">Any type</option>{typesIn.map(([id, t]) => <option key={id} value={id}>{t}</option>)}</select>
+            <select aria-label="Device" className={SELECT} value={deviceF} onChange={(e) => setDeviceF(e.target.value)}><option value="">Any device</option>{devicesIn.map((d) => <option key={d} value={d}>{d}</option>)}</select>
+            <label className="text-soft flex items-center gap-1.5 text-[12px]"><input type="checkbox" className="accent-accent" checked={riskOnly} onChange={(e) => setRiskOnly(e.target.checked)} />At risk only</label>
+            <select aria-label="Sort by" className={SELECT} value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>{SORTS.map((o) => <option key={o.v} value={o.v}>Sort: {o.l}</option>)}</select>
+          </div>
+          <p className="text-soft mb-1 text-[12px]" aria-live="polite">{filtering ? `${shown.length} of ${services.length} services` : `${services.length} service${services.length === 1 ? "" : "s"}`}{filtering ? <> · <button type="button" className="underline" onClick={() => { setQ(""); setStatusF(""); setTypeF(""); setDeviceF(""); setRiskOnly(false); }}>Clear filters</button></> : null}</p>
+          <ul className="divide-y divide-line rounded-md border border-line bg-surface" aria-label="Services">
+            {shown.length === 0 ? <li className="text-soft px-3 py-3 text-[13px]">No service matches these filters.</li> : null}
+            {shown.map((s) => (
               <li key={s.id}>
                 <button type="button" onClick={() => { setOpenId(s.id === openId ? null : s.id); setPlan(null); }} aria-pressed={s.id === openId} className={cn("block w-full px-3 py-2 text-left hover:bg-surface-2", s.id === openId && "bg-surface-2")}>
                   <div className="flex items-center justify-between gap-2"><span className="truncate text-[13px] font-medium">{s.name}</span><span className="flex items-center gap-1">{seriousOf(s.id).length ? <Badge className={seriousOf(s.id).some((r) => r.severity === "critical") ? "text-bad" : "text-warn"}>at risk</Badge> : null}<Badge className={TONE[s.status]}>{s.status}</Badge></span></div>
@@ -143,6 +191,7 @@ export function ServicesView() {
               </li>
             ))}
           </ul>
+          </div>
 
           <section aria-label="Service details">
             {!detail ? <p className="text-soft text-[13px]">Select a service to see what it is, where it is and its history.</p> : (
@@ -216,6 +265,27 @@ export function ServicesView() {
           </section>
         </div>
       )}
+
+      <details className="mt-6 rounded-md border border-line bg-surface" onToggle={(e) => setDevicesOpen((e.currentTarget as HTMLDetailsElement).open)}>
+        <summary className="cursor-pointer px-3 py-2 text-[13px] font-medium">Running on the devices <span className="text-soft font-normal">· what each device&apos;s latest saved configuration says it runs</span></summary>
+        <div className="border-t border-line px-3 py-2">
+          {devicesError ? <p role="alert" className="text-[13px] text-bad">{devicesError}</p> : onDevices === null ? <p className="text-soft text-[13px]">Loading...</p> : onDevices.length === 0 ? (
+            <p className="text-soft text-[13px]">No configuration has been saved for this network yet. Take a backup on the Backups page and it appears here.</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {onDevices.map((d) => (
+                <li key={d.device} className="py-2">
+                  <div className="flex items-baseline justify-between gap-2"><span className="font-mono text-[13px] font-medium">{d.device}</span><span className="text-soft text-[12px]">from a copy saved {relativeTime(d.takenAt)}</span></div>
+                  {d.running.length === 0 ? <p className="text-soft text-[12px]">Nothing recognised in this configuration.</p> : (
+                    <ul className="mt-1 flex flex-wrap gap-1.5">{d.running.map((r) => <li key={r.id} className="rounded-sm border border-line bg-surface-2 px-2 py-0.5 text-[12px]"><span className="font-medium">{r.label}</span> <span className="text-soft">{r.detail}</span></li>)}</ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-soft mt-2 text-[12px]">This reads saved configurations, not the devices, and says what is configured, not that it works. Diagnostics checks that.</p>
+        </div>
+      </details>
     </div>
   );
 }

@@ -69,12 +69,12 @@ export function LinesView({ lines }: { lines: Lines }) {
  * the exact lines each one would get. Filing it remembers the service and creates an ordinary change, so approval, the snapshot,
  * read-back verification and rollback all apply. Nothing here touches a device.
  */
-export function ServicePanel({ scopeId, existing = null, onDone, onCancel }: { scopeId: string; existing?: ServiceInstance | null; onDone: (changeId: string | null) => Promise<void>; onCancel?: () => void }) {
+export function ServicePanel({ scopeId, existing = null, initialServiceId = null, onDone, onCancel }: { scopeId: string; existing?: ServiceInstance | null; initialServiceId?: string | null; onDone: (changeId: string | null) => Promise<void>; onCancel?: () => void }) {
   const modifying = existing !== null;
   const start = existing ? (existing.applied ?? { values: existing.values, devices: existing.devices }) : null;
   const [services, setServices] = useState<Service[] | null>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
-  const [serviceId, setServiceId] = useState<string | null>(existing?.serviceId ?? null);
+  const [serviceId, setServiceId] = useState<string | null>(existing?.serviceId ?? initialServiceId);
   const [values, setValues] = useState<Values>((start?.values as Values) ?? {});
   const [chosen, setChosen] = useState<string[]>(start?.devices ?? []);
   const [name, setName] = useState(existing?.name ?? "");

@@ -1,6 +1,9 @@
 import { hostKeyPem } from "./helpers/host-key";
 import { type AddressInfo } from "node:net";
-import { Server } from "ssh2";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, sep } from "node:path";
+import { Server, utils } from "ssh2";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DeviceRef } from "@/lib/core/types";
 import { SshTransport, type SshTarget } from "@/lib/transport/ssh";
@@ -14,7 +17,7 @@ const BRIEF = [
 
 type Fake = { port: number; close: () => void; sent: string[]; logins: number };
 
-function startServer(opts: { password?: string; hostName?: string; pager?: boolean } = {}): Promise<Fake> {
+function startServer(opts: { password?: string; hostName?: string; pager?: boolean; publicKey?: string } = {}): Promise<Fake> {
   const password = opts.password ?? "secret";
   const host = opts.hostName ?? "R1";
   const hostKey = hostKeyPem();
@@ -22,7 +25,16 @@ function startServer(opts: { password?: string; hostName?: string; pager?: boole
   const fake: Fake = { port: 0, close: () => undefined, sent, logins: 0 };
   const server = new Server({ hostKeys: [hostKey] }, (client) => {
     client.on("authentication", (ctx) => {
-      if (ctx.method === "password" && ctx.username === "admin" && ctx.password === password) { fake.logins++; ctx.accept(); } else ctx.reject(["password"]);
+      if (ctx.method === "password" && !opts.publicKey && ctx.username === "admin" && ctx.password === password) { fake.logins++; ctx.accept(); return; }
+      if (ctx.method === "publickey" && opts.publicKey && ctx.username === "admin") {
+        const trusted = utils.parseKey(opts.publicKey);
+        const same = !(trusted instanceof Error) && ctx.key.algo === trusted.type && ctx.key.data.equals(trusted.getPublicSSH());
+        if (!same) { ctx.reject(["publickey"]); return; }
+        if (!ctx.signature) { ctx.accept(); return; } // the probe before the signed attempt
+        if (trusted.verify(ctx.blob!, ctx.signature, ctx.hashAlgo)) { fake.logins++; ctx.accept(); } else ctx.reject(["publickey"]);
+        return;
+      }
+      ctx.reject(opts.publicKey ? ["publickey"] : ["password"]);
     });
     client.on("ready", () => client.on("session", (accept) => {
       const session = accept();
@@ -200,5 +212,63 @@ describe("SSH transport", () => {
     const r = await transport.run(dev, "show ip interface brief");
     expect(r.ok).toBe(true);
     expect(r.text).toContain("GigabitEthernet0/1");
+  });
+});
+
+describe("SSH transport, key login", () => {
+  let dir: string;
+  let keyed: Fake;
+  const pair = (passphrase?: string) => utils.generateKeyPairSync("ed25519", passphrase ? { passphrase, cipher: "aes256-ctr", rounds: 16 } : undefined);
+  const write = (name: string, text: string) => { const f = join(dir, name); writeFileSync(f, text, { mode: 0o600 }); return f.split(sep).join("/"); };
+  const run = (t: Partial<SshTarget>, e: Record<string, string | undefined> = {}) => {
+    const tr = new SshTransport(() => ({ label: "R1", host: "127.0.0.1", port: keyed.port, username: "admin", ...t }), { hostKeys: memStore(), env: e, connectTimeoutMs: 5000, commandTimeoutMs: 5000 });
+    return tr.run(dev, "show ip interface brief").finally(() => tr.closeAll());
+  };
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "ts-key-")); });
+  afterEach(() => { keyed?.close(); rmSync(dir, { recursive: true, force: true }); });
+
+  it("logs in with a private key from a file, with no password at all", async () => {
+    const k = pair();
+    keyed = await startServer({ publicKey: k.public });
+    const r = await run({ privateKey: `file:${write("id", k.private)}` });
+    expect(r.ok).toBe(true);
+    expect(r.text).toContain("GigabitEthernet0/0     10.0.0.1");
+    expect(keyed.logins).toBe(1);
+  });
+
+  it("logs in with a passphrase-protected key when the passphrase is given by reference", async () => {
+    const k = pair("correct horse");
+    keyed = await startServer({ publicKey: k.public });
+    const r = await run({ privateKey: `file:${write("id", k.private)}`, passphrase: "env:KEY_PASS" }, { KEY_PASS: "correct horse" });
+    expect(r.ok).toBe(true);
+    expect(keyed.logins).toBe(1);
+  });
+
+  it("fails clearly, without exposing the passphrase, when the passphrase is wrong or missing", async () => {
+    const k = pair("correct horse");
+    keyed = await startServer({ publicKey: k.public });
+    const f = `file:${write("id", k.private)}`;
+    for (const t of [{ privateKey: f, passphrase: "env:KEY_PASS" }, { privateKey: f }]) {
+      const r = await run(t, { KEY_PASS: "wrong one" });
+      expect(r.ok).toBe(false);
+      expect(r.text).not.toContain("wrong one");
+      expect(r.text).not.toContain("correct horse");
+    }
+    expect(keyed.logins).toBe(0);
+  });
+
+  it("reports a key the device does not trust as a refused login", async () => {
+    keyed = await startServer({ publicKey: pair().public });
+    const r = await run({ privateKey: `file:${write("other", pair().private)}` });
+    expect(r.ok).toBe(false);
+    expect(r.text).toMatch(/login was refused/);
+    expect(keyed.logins).toBe(0);
+  });
+
+  it("says so when the key file does not exist", async () => {
+    keyed = await startServer({ publicKey: pair().public });
+    const r = await run({ privateKey: `file:${join(dir, "missing").split(sep).join("/")}` });
+    expect(r.ok).toBe(false);
+    expect(r.text).not.toMatch(/login was refused/);
   });
 });
