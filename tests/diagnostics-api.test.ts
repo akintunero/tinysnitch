@@ -104,7 +104,7 @@ describe("running diagnostics", () => {
     expect(byLabel.R1).toMatchObject({ inspected: true, commandsRun: 4, commandsFailed: 0 });
     expect(byLabel.R3).toMatchObject({ inspected: false, reason: expect.stringMatching(/Not running/) });
     expect(byLabel.H1).toMatchObject({ inspected: false, reason: expect.stringMatching(/Not an IOS router or switch/) });
-    expect(body.run.notRun.join()).toMatch(/routing loops/);
+    expect(body.run.notRun.join()).toMatch(/routing loops/i);
     // Both ends reported up/up and the ping succeeded, so the topology may show it as operational.
     expect(body.links.l1).toMatchObject({ status: "operational", text: expect.stringMatching(/ping between them succeeded/) });
     expect(body.links.l2).toBeUndefined();
@@ -253,7 +253,7 @@ describe("interpretation", () => {
     const { text: t } = await r.json();
     expect(seen).toHaveLength(0);
     expect(t).toMatch(/no problems/);
-    expect(t).toMatch(/routing loops/);
+    expect(t).toMatch(/routing loops/i);
     expect(t).toMatch(/not proof the network is healthy/);
   });
 

@@ -1,0 +1,4 @@
+
+Tag null:
+System Id       Type Interface     IP Address      State Holdtime Circuit Id
+Amsterdam       L2   Et0/0         10.0.45.1       UP    24       02

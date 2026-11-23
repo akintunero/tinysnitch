@@ -1,4 +1,7 @@
+import type { MessagesClient } from "@/lib/anthropic/bridge";
 import { addAudit } from "@/lib/database/repo";
+import { pseudonymisingClient } from "@/lib/privacy/client";
+import { auditPrivacy, pseudonymiserFor } from "@/lib/privacy/session";
 import { interpretFindings } from "@/lib/diagnostics/interpret";
 import { latestRun, openFindings, setInterpretation } from "@/lib/diagnostics/store";
 import { getContext } from "@/lib/server/context";
@@ -20,12 +23,17 @@ export const POST = route(async (_req, params) => {
   if (findings.length && (!ctx.anthropic || !ctx.claude.model)) throw new HttpError(503, ctx.claude.configError ?? "Claude is not configured.", "claude_unavailable");
 
   let text: string;
+  const pseudo = findings.length ? await pseudonymiserFor(ctx.db, parsed.data) : null;
   try {
-    text = await interpretFindings(ctx.anthropic as NonNullable<typeof ctx.anthropic>, ctx.claude.model ?? "", { labTitle: (await labTitle(parsed.data)) ?? parsed.data, findings, run });
+    const client = ctx.anthropic as NonNullable<typeof ctx.anthropic>;
+    // Only the findings' own text goes out, and through the same masking wrapper as the assistant.
+    const masked = pseudo ? (pseudonymisingClient(client as unknown as MessagesClient, pseudo) as unknown as typeof client) : client;
+    text = await interpretFindings(masked, ctx.claude.model ?? "", { labTitle: (await labTitle(parsed.data)) ?? parsed.data, findings, run });
   } catch (e) {
     addAudit(ctx.db, { kind: "error", summary: `Explaining findings failed: ${(e as Error).message}` });
     throw new HttpError(502, (e as Error).message);
   }
+  if (findings.length) auditPrivacy(ctx.db, "Explain findings", pseudo, parsed.data);
   setInterpretation(ctx.db, run.id, text);
   if (findings.length) addAudit(ctx.db, { kind: "claude", actor: "user", summary: `Claude explained ${findings.length} diagnostic findings`, data: { runId: run.id } });
   return json({ text, runId: run.id });

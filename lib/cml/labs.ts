@@ -10,7 +10,7 @@ export type LabSummary = {
   description: string;
   /** Which provider the scope comes from. Absent on a bare CML lab, which is `cml`. */
   providerId?: string;
-  providerKind?: "cml" | "static" | "netbox" | "discovery";
+  providerKind?: "cml" | "static" | "netbox" | "discovery" | "ansible";
   environment?: "lab" | "production";
 };
 

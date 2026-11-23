@@ -1,0 +1,62 @@
+-------------------------
+Device ID: Cornwall
+Entry address(es): 
+  IP address: 10.0.12.2
+Platform: Linux Unix,  Capabilities: Router 
+Interface: Ethernet0/0,  Port ID (outgoing port): Ethernet0/0
+Holdtime : 140 sec
+
+Version :
+Cisco IOS Software [IOSXE], Linux Software (X86_64BI_LINUX-ADVENTERPRISEK9-M), Version 17.18.2, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2025 by Cisco Systems, Inc.
+Compiled Fri 19-Dec-25 03:28 by mcpre
+
+advertisement version: 2
+Peer Source MAC: aabb.cc00.0700
+Duplex: full
+Management address(es): 
+  IP address: 10.0.12.2
+
+-------------------------
+Device ID: Hamburg
+Entry address(es): 
+  IP address: 10.0.15.2
+Platform: Linux Unix,  Capabilities: Router 
+Interface: Ethernet0/2,  Port ID (outgoing port): Ethernet0/1
+Holdtime : 146 sec
+
+Version :
+Cisco IOS Software [IOSXE], Linux Software (X86_64BI_LINUX-ADVENTERPRISEK9-M), Version 17.18.2, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2025 by Cisco Systems, Inc.
+Compiled Fri 19-Dec-25 03:28 by mcpre
+
+advertisement version: 2
+Peer Source MAC: aabb.cc00.0910
+Duplex: full
+Management address(es): 
+  IP address: 10.0.15.2
+
+-------------------------
+Device ID: Paris
+Entry address(es): 
+  IP address: 10.0.13.2
+Platform: Linux Unix,  Capabilities: Router 
+Interface: Ethernet0/1,  Port ID (outgoing port): Ethernet0/1
+Holdtime : 155 sec
+
+Version :
+Cisco IOS Software [IOSXE], Linux Software (X86_64BI_LINUX-ADVENTERPRISEK9-M), Version 17.18.2, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2025 by Cisco Systems, Inc.
+Compiled Fri 19-Dec-25 03:28 by mcpre
+
+advertisement version: 2
+Peer Source MAC: aabb.cc00.0810
+Duplex: full
+Management address(es): 
+  IP address: 10.0.13.2
+
+
+Total cdp entries displayed : 3

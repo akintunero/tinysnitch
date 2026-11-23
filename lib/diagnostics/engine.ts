@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { TopoNode } from "../cml/topology";
 import { type DeviceRef, nodeRef } from "../core/types";
-import { addAudit } from "../database/repo";
+import { addAudit, getSettings } from "../database/repo";
 import { hasCliRunner } from "../providers/cml";
 import { providerFor } from "../providers/registry";
 import { redactSecrets } from "../security/redact";
@@ -17,9 +17,9 @@ import type { CommandResult, DeviceReport, DeviceSnapshot, PingResult, RunSummar
 
 /** Stated plainly in every run so nobody reads silence as a clean bill of health for these. */
 export const NOT_CHECKED = [
-  "Incorrect next hops, routing loops and missing routes",
-  "Spanning-tree inconsistencies",
-  "Conflicting ACLs",
+  "Routing loops, missing dynamic routes and incorrect next hops other than static routes",
+  "ACL behaviour beyond entries that can never match and ACLs that are applied but undefined",
+  "Spanning-tree design (which switch should be root), beyond inconsistent ports and linked switches that disagree",
   "Host default gateways",
   "Traceroute paths and asymmetric reachability",
   "Devices that are not IOS routers or switches (hosts, connectors, firewalls)",
@@ -108,7 +108,9 @@ export async function runDiagnostics(scopeId: string, opts: { pings?: boolean } 
       });
     }
 
-    const analysis = analyse(topology, snapshots, pings);
+    const mode = getSettings(ctx.db).complianceChecks;
+    const compliance = mode === "all" || (mode === "production" && topology.lab.environment === "production");
+    const analysis = analyse(topology, snapshots, pings, { compliance });
     const finishedAt = new Date().toISOString();
     const run: RunSummary = {
       id: randomUUID(), labId: scopeId, startedAt, finishedAt,

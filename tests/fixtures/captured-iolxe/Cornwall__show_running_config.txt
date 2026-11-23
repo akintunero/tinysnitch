@@ -1,0 +1,207 @@
+Building configuration...
+
+Current configuration : 4011 bytes
+!
+! Last configuration change at 16:05:58 UTC Fri Nov 20 2026
+!
+version 17.18
+service timestamps debug datetime msec
+service timestamps log datetime msec
+!
+hostname Cornwall
+!
+boot-start-marker
+boot-end-marker
+!
+!
+no logging console
+no aaa new-model
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+no ip domain lookup
+ip cef
+login on-success log
+no ipv6 cef
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+memory free low-watermark processor 79866
+!
+!
+spanning-tree mode rapid-pvst
+!
+!
+!
+!
+!
+!
+!
+! 
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface Loopback0
+ description Router-ID and iBGP peering
+ ip address 10.255.0.2 255.255.255.255
+!
+interface Loopback1
+ description Test service address
+ ip address 10.102.255.1 255.255.255.255
+!
+interface Ethernet0/0
+ description to London e0/0
+ ip address 10.0.12.2 255.255.255.252
+ ip router isis 
+ isis network point-to-point 
+ isis metric 10 level-1
+ isis metric 10 level-2
+!
+interface Ethernet0/1
+ description to Paris e0/0
+ ip address 10.0.23.1 255.255.255.252
+!
+interface Ethernet0/2
+ description eBGP to Amsterdam e0/2
+ ip address 10.0.24.1 255.255.255.252
+!
+interface Ethernet0/3
+ no ip address
+ shutdown
+!
+router isis
+ net 49.0001.0000.0000.0002.00
+ is-type level-2-only
+ metric-style wide
+ log-adjacency-changes
+ passive-interface Loopback0
+!
+router bgp 65100
+ bgp router-id 10.255.0.2
+ bgp log-neighbor-changes
+ no bgp default ipv4-unicast
+ neighbor 10.0.24.2 remote-as 65200
+ neighbor 10.255.0.1 remote-as 65100
+ neighbor 10.255.0.1 update-source Loopback0
+ neighbor 10.255.0.3 remote-as 65100
+ neighbor 10.255.0.3 update-source Loopback0
+ !
+ address-family ipv4
+  network 10.102.0.0 mask 255.255.255.0
+  network 10.102.1.0 mask 255.255.255.0
+  network 10.102.2.0 mask 255.255.255.0
+  network 10.102.3.0 mask 255.255.255.0
+  network 10.102.4.0 mask 255.255.255.0
+  network 10.102.5.0 mask 255.255.255.0
+  network 10.102.6.0 mask 255.255.255.0
+  network 10.102.7.0 mask 255.255.255.0
+  network 10.102.8.0 mask 255.255.255.0
+  network 10.102.9.0 mask 255.255.255.0
+  network 10.102.10.0 mask 255.255.255.0
+  network 10.102.11.0 mask 255.255.255.0
+  network 10.102.12.0 mask 255.255.255.0
+  network 10.102.13.0 mask 255.255.255.0
+  network 10.102.14.0 mask 255.255.255.0
+  network 10.102.15.0 mask 255.255.255.0
+  network 10.102.16.0 mask 255.255.255.0
+  network 10.102.17.0 mask 255.255.255.0
+  network 10.102.18.0 mask 255.255.255.0
+  network 10.102.19.0 mask 255.255.255.0
+  network 10.102.255.1 mask 255.255.255.255
+  neighbor 10.0.24.2 activate
+  neighbor 10.0.24.2 prefix-list FROM-AMS in
+  neighbor 10.0.24.2 route-map LP-SECONDARY in
+  neighbor 10.255.0.1 activate
+  neighbor 10.255.0.3 activate
+  neighbor 10.255.0.3 next-hop-self
+ exit-address-family
+!
+ip forward-protocol nd
+!
+!
+ip http server
+ip http secure-server
+ip route 10.102.0.0 255.255.255.0 Null0
+ip route 10.102.1.0 255.255.255.0 Null0
+ip route 10.102.2.0 255.255.255.0 Null0
+ip route 10.102.3.0 255.255.255.0 Null0
+ip route 10.102.4.0 255.255.255.0 Null0
+ip route 10.102.5.0 255.255.255.0 Null0
+ip route 10.102.6.0 255.255.255.0 Null0
+ip route 10.102.7.0 255.255.255.0 Null0
+ip route 10.102.8.0 255.255.255.0 Null0
+ip route 10.102.9.0 255.255.255.0 Null0
+ip route 10.102.10.0 255.255.255.0 Null0
+ip route 10.102.11.0 255.255.255.0 Null0
+ip route 10.102.12.0 255.255.255.0 Null0
+ip route 10.102.13.0 255.255.255.0 Null0
+ip route 10.102.14.0 255.255.255.0 Null0
+ip route 10.102.15.0 255.255.255.0 Null0
+ip route 10.102.16.0 255.255.255.0 Null0
+ip route 10.102.17.0 255.255.255.0 Null0
+ip route 10.102.18.0 255.255.255.0 Null0
+ip route 10.102.19.0 255.255.255.0 Null0
+ip ssh bulk-mode 131072
+!
+ip prefix-list FROM-AMS seq 5 deny 10.104.8.0/21 ge 24 le 24
+ip prefix-list FROM-AMS seq 10 permit 0.0.0.0/0 le 32
+no logging btrace
+route-map LP-SECONDARY permit 10 
+ set local-preference 150
+!
+!
+!
+!
+control-plane
+!
+!
+!
+line con 0
+ exec-timeout 0 0
+ activation-character 13
+ logging synchronous
+line aux 0
+ activation-character 13
+line vty 0 4
+ exec-timeout 0 0
+ activation-character 13
+ logging synchronous
+ login
+ transport input ssh
+!
+!
+!
+!
+end

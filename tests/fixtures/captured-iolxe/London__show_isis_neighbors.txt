@@ -1,0 +1,5 @@
+
+Tag null:
+System Id       Type Interface     IP Address      State Holdtime Circuit Id
+Cornwall        L2   Et0/0         10.0.12.2       UP    27       01
+Paris           L2   Et0/1         10.0.13.2       UP    28       02

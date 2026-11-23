@@ -3,9 +3,14 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Markdown } from "@/components/assistant/markdown";
+import { useApp } from "@/components/layout/status-provider";
 import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/status-dot";
 import { ClientError, apiGet, apiSend } from "@/lib/client";
+import type { HistoryPoint } from "@/lib/diagnostics/store";
+import type { FindingImpact } from "@/lib/provisioning/impact";
+import { Trend } from "./trend";
 import type { DerivedLink, NodeFault } from "@/lib/diagnostics/state";
 import type { StoredFinding, StoredRun } from "@/lib/diagnostics/store";
 import { cn, relativeTime } from "@/lib/utils";
@@ -30,11 +35,16 @@ export function DiagnosticsView({ labId, labTitle }: { labId: string; labTitle: 
   const [pings, setPings] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const { can } = useApp();
+  const [impact, setImpact] = useState<FindingImpact[]>([]);
 
   const load = useCallback(async () => {
     try {
       setData(await apiGet<DiagnosticsData>(`/api/labs/${labId}/diagnostics`));
       setError(null);
+      apiGet<{ points: HistoryPoint[] }>(`/api/labs/${labId}/history`).then((h) => setHistory(h.points)).catch(() => setHistory([]));
+      apiGet<{ findings: FindingImpact[] }>(`/api/services/impact?scope=${encodeURIComponent(labId)}`).then((r) => setImpact(r.findings)).catch(() => setImpact([]));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -56,8 +66,9 @@ export function DiagnosticsView({ labId, labTitle }: { labId: string; labTitle: 
       const r = await apiSend<DiagnosticsData>("POST", `/api/labs/${labId}/diagnostics`, { pings });
       setData(r);
       setSelected(null);
+      apiGet<{ points: HistoryPoint[] }>(`/api/labs/${labId}/history`).then((h) => setHistory(h.points)).catch(() => undefined);
     } catch (e) {
-      setError(e instanceof ClientError && e.status === 409 ? "Diagnostics are already running for this lab." : (e as Error).message);
+      setError(e instanceof ClientError && e.status === 409 ? "Diagnostics are already running for this network." : (e as Error).message);
     } finally {
       setRunning(false);
     }
@@ -96,7 +107,16 @@ export function DiagnosticsView({ labId, labTitle }: { labId: string; labTitle: 
           <p className="text-soft text-[12px]">{labTitle ?? "Selected lab"} · read-only checks on running routers and switches</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-1.5 text-[12px]"><input type="checkbox" className="accent-ink" checked={pings} onChange={(e) => setPings(e.target.checked)} />Include ping tests</label>
+          <label className="flex items-center gap-1.5 text-[12px]"><input type="checkbox" className="accent-accent" checked={pings} onChange={(e) => setPings(e.target.checked)} />Include ping tests</label>
+          {can("approver") && data?.run ? (
+            <ConfirmButton
+              label="Clear history"
+              confirmLabel="Yes, clear"
+              message="Forgets every run and finding for this network, the trend chart and the fault flags on the topology. The next run starts fresh. Recorded in Activity."
+              onConfirm={() => apiSend("DELETE", `/api/labs/${labId}/diagnostics`)}
+              onDone={() => { setSelected(null); void load(); }}
+            />
+          ) : null}
           <Button variant="primary" onClick={() => void run()} disabled={running}>{running ? "Running" : run_ ? "Run again" : "Run diagnostics"}</Button>
         </div>
       </div>
@@ -130,6 +150,8 @@ export function DiagnosticsView({ labId, labTitle }: { labId: string; labTitle: 
             <ul className="mt-1 list-disc pl-5 text-soft">{run_.notRun.map((n) => <li key={n}>{n}</li>)}</ul>
           </details>
 
+          <Trend points={history} />
+
           <div className="mt-5 grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
             <section aria-label="Findings">
               {findings.length ? (
@@ -149,12 +171,12 @@ export function DiagnosticsView({ labId, labTitle }: { labId: string; labTitle: 
                   ))}
                 </ul>
               ) : inspected === 0
-                ? <EmptyState title="Nothing was checked">No device in this lab could be read, so there are no findings. This says nothing about the network's health. Start the routers and switches in CML, then run diagnostics again. The reasons are listed above.</EmptyState>
-                : <EmptyState title="No findings">The checks saw nothing wrong on the devices they could read. That is not proof the network is healthy; see what is not checked above.</EmptyState>}
+                ? <EmptyState title="Nothing was checked">No device could be read, so there are no findings. That says nothing about the network's health; the reasons are listed above.</EmptyState>
+                : <EmptyState title="No findings">Nothing wrong was found on the devices that could be read. That is not proof the network is healthy; see what is not checked above.</EmptyState>}
             </section>
 
             <section aria-label="Finding details">
-              {open ? <FindingDetail f={open} /> : findings.length ? <p className="text-soft text-[13px]">Select a finding to see its evidence.</p> : null}
+              {open ? <FindingDetail f={open} affected={impact.find((i) => i.findingId === open.id)?.affected ?? []} /> : findings.length ? <p className="text-soft text-[13px]">Select a finding to see its evidence.</p> : null}
             </section>
           </div>
 
@@ -163,7 +185,7 @@ export function DiagnosticsView({ labId, labTitle }: { labId: string; labTitle: 
               <h2 className="text-[14px] font-semibold">Explanation</h2>
               <Button onClick={() => void explain()} disabled={explaining}>{explaining ? "Asking Claude" : run_.interpretation ? "Explain again" : "Explain findings"}</Button>
             </div>
-            <p className="text-soft mb-2 text-[12px]">Claude explains the findings above and suggests next checks. It cannot add findings, and nothing it suggests is applied.</p>
+            <p className="text-soft mb-2 text-[12px]">Claude explains the findings above. It cannot add findings or change anything.</p>
             {run_.interpretation ? <div className="text-[14px]"><Markdown>{run_.interpretation}</Markdown></div> : null}
           </section>
         </>
@@ -172,7 +194,7 @@ export function DiagnosticsView({ labId, labTitle }: { labId: string; labTitle: 
   );
 }
 
-function FindingDetail({ f }: { f: StoredFinding }) {
+function FindingDetail({ f, affected }: { f: StoredFinding; affected: FindingImpact["affected"] }) {
   const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div className="mt-3"><h3 className="text-soft mb-0.5 text-[11px] font-semibold uppercase tracking-wide">{label}</h3><div className="text-[13px]">{children}</div></div>
   );
@@ -184,7 +206,19 @@ function FindingDetail({ f }: { f: StoredFinding }) {
       <h2 className="text-[15px] font-semibold">{f.title}</h2>
       <p className="text-soft text-[12px]">{f.device}{f.interface ? ` · ${f.interface}` : ""}{f.peer ? ` · to ${f.peer.device} ${f.peer.interface}` : ""}</p>
       <p className="mt-2 text-[13px]">{f.description}</p>
-      <Row label="Evidence"><pre className="overflow-x-auto rounded-sm bg-ink p-2.5 font-mono text-[11.5px] leading-relaxed text-surface-2">{f.evidence.join("\n")}</pre></Row>
+      <Row label="Evidence"><pre className="overflow-x-auto rounded-sm bg-code p-2.5 font-mono text-[11.5px] leading-relaxed text-code-ink">{f.evidence.join("\n")}</pre></Row>
+      {affected.length ? (
+        <Row label="Services affected">
+          <ul className="space-y-0.5">
+            {affected.map((a) => (
+              <li key={a.serviceId} className="flex flex-wrap items-baseline gap-2">
+                <Link className="underline decoration-line underline-offset-2 hover:decoration-ink" href="/services">{a.name}</Link>
+                <span className="text-soft text-[12px]">{a.title} · {a.status} · {a.match === "interface" ? "uses this interface" : "on this device, not tied to one interface"}</span>
+              </li>
+            ))}
+          </ul>
+        </Row>
+      ) : null}
       <Row label="Probable cause">{f.probableCause}</Row>
       <Row label="Recommended action">{f.recommendedAction}</Row>
       <Row label={f.status === "confirmed" ? "How it was confirmed" : "How to confirm it"}>{f.verification}</Row>

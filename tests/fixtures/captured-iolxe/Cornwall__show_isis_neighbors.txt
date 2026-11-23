@@ -1,0 +1,4 @@
+
+Tag null:
+System Id       Type Interface     IP Address      State Holdtime Circuit Id
+London          L2   Et0/0         10.0.12.1       UP    25       01

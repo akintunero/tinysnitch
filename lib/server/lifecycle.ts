@@ -1,6 +1,9 @@
+import { authState, setupToken } from "../auth/access";
+import { purgeExpiredSessions } from "../auth/store";
 import { failInterrupted } from "../changes/store";
 import { addAudit } from "../database/repo";
 import { connectMcp, getContext } from "./context";
+import { startScheduler } from "./scheduler";
 
 /**
  * Node-only startup work, kept out of instrumentation.ts so the Edge build never sees process signals.
@@ -12,6 +15,17 @@ export function startLifecycle(): void {
     const db = getContext().db;
     const n = failInterrupted(db);
     if (n) addAudit(db, { kind: "configuration", summary: `${n} change(s) were interrupted by a restart and marked failed. Check those devices before trying again.` });
+  } catch {
+    /* the database is unavailable; the status page will say so */
+  }
+
+  try {
+    const db = getContext().db;
+    purgeExpiredSessions(db);
+    const st = authState(db);
+    // An install that listens beyond this machine stays closed until its first administrator exists. The token that
+    // opens that door is shown here, in the server's own log, which only whoever runs the server can read.
+    if (st.setupRequired) console.error(`Tiny Snitch is waiting to be set up. Open it in a browser and create the first administrator with this setup token: ${setupToken()}`);
   } catch {
     /* the database is unavailable; the status page will say so */
   }
@@ -36,4 +50,5 @@ export function startLifecycle(): void {
   }
 
   void connectMcp(true);
+  startScheduler();
 }

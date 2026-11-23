@@ -1,0 +1,44 @@
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "application"
+  Sending updates every 0 seconds
+  Invalid after 0 seconds, hold down 0, flushed after 0
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Maximum path: 32
+  Routing for Networks:
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+  Distance: (default is 4)
+
+Routing Protocol is "isis"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Redistributing: isis
+  Address Summarization:
+    None
+  Maximum path: 4
+  Routing for Networks:
+    Ethernet0/0
+  Passive Interface(s):
+    Loopback0
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    10.255.0.4           115      00:10:36
+  Distance: (default is 115)
+
+Routing Protocol is "bgp 65200"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  IGP synchronization is disabled
+  Automatic route summarization is disabled
+  Neighbor(s):
+    Address          FiltIn FiltOut DistIn DistOut Weight RouteMap
+    10.0.15.1                                            
+    10.255.0.4                                           
+  Maximum path: 1
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    10.0.15.1             20      07:14:00
+    10.255.0.4           200      01:04:25
+  Distance: external 20 internal 200 local 200

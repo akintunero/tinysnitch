@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { deriveFromRun } from "@/lib/diagnostics/state";
 import { runDiagnostics } from "@/lib/diagnostics/engine";
-import { latestRun, openFindings } from "@/lib/diagnostics/store";
+import { clearDiagnostics, latestRun, openFindings } from "@/lib/diagnostics/store";
+import { addAudit } from "@/lib/database/repo";
 import { getContext } from "@/lib/server/context";
 import { HttpError, json, readJson, route } from "@/lib/server/http";
 import { fetchTopology } from "@/lib/server/topology";
@@ -44,3 +45,12 @@ export const POST = route(async (req, params) => {
   const derived = deriveFromRun(await fetchTopology(id), result.run, result.findings);
   return json({ run: { ...result.run, interpretation: null }, findings: result.findings, opened: result.opened, cleared: result.cleared, ...derived, topologyError: null });
 }, { write: true });
+
+/** Forgets this network's diagnostic runs and findings. The next run starts a new history. */
+export const DELETE = route(async (_req, params) => {
+  const id = labId(params);
+  const { db } = getContext();
+  const r = clearDiagnostics(db, id);
+  addAudit(db, { kind: "diagnostic", actor: "user", summary: `Cleared diagnostics history (${r.runs} runs, ${r.findings} findings)`, data: { scopeId: id, ...r } });
+  return json(r);
+}, { write: true, role: "approver" });

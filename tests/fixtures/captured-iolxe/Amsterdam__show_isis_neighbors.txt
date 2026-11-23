@@ -1,0 +1,4 @@
+
+Tag null:
+System Id       Type Interface     IP Address      State Holdtime Circuit Id
+Hamburg         L2   Et0/1         10.0.45.2       UP    29       01

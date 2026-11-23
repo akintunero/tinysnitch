@@ -2,7 +2,10 @@
  * Captures the raw output of the diagnostic commands from a running CML lab, read-only, into tests/fixtures/captured.
  * Real output is the only honest test input for the parsers. Secrets are redacted before anything is written.
  *
- *   npm run capture -- <labId> [label ...]      all running nodes when no label is given
+ *   npm run capture -- <labId> <label> [label ...] [--out <folder>]
+ *
+ * Each lab goes to its own folder under tests/fixtures (default: captured-<first 8 characters of the lab id>), because
+ * different labs reuse router names and one capture must never overwrite another's.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -12,8 +15,12 @@ import { CMD } from "../lib/diagnostics/commands";
 import { McpService } from "../lib/mcp/service";
 import { redactSecrets } from "../lib/security/redact";
 
-const [labId, ...labels] = process.argv.slice(2);
-if (!labId) { console.error("usage: npm run capture -- <labId> [label ...]"); process.exit(2); }
+const args = process.argv.slice(2);
+const outAt = args.indexOf("--out");
+const outName = outAt >= 0 ? args.splice(outAt, 2)[1] : undefined;
+const [labId, ...labels] = args;
+if (!labId || !labels.length || (outAt >= 0 && !outName)) { console.error("usage: npm run capture -- <labId> <label> [label ...] [--out <folder>]"); process.exit(2); }
+if (outName && !/^[A-Za-z0-9._-]+$/.test(outName)) { console.error("--out must be a plain folder name"); process.exit(2); }
 
 const svc = new McpService(loadMcpConfig(), {});
 await svc.connect();
@@ -23,9 +30,9 @@ try {
   const props = Object.keys((svc.tools().find((t) => t.name === policy.tool)?.inputSchema as { properties?: object }).properties ?? {});
   const labProp = props.find((p) => /^(lid|lab_id|labid|lab)$/i.test(p))!;
   const labelProp = props.find((p) => /^(label|node_label|nodelabel)$/i.test(p))!;
-  const dir = join("tests", "fixtures", "captured");
+  const dir = join("tests", "fixtures", outName ?? `captured-${labId.slice(0, 8)}`);
   mkdirSync(dir, { recursive: true });
-  const extra = ["show version", "show ip protocols", "show cdp neighbors detail", "show lldp neighbors detail", "show ip route", "show spanning-tree"];
+  const extra = ["show version", "show ip protocols", "show cdp neighbors detail", "show lldp neighbors detail", "show ip route", "show spanning-tree", "show isis neighbors", "show ip route summary", "show ip bgp"];
   for (const label of labels) {
     for (const command of [...Object.values(CMD), ...extra]) {
       if (!checkReadOnlyCommand(command).ok) continue;

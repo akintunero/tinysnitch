@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import type { TopoLink, TopoNode, Topology } from "../cml/topology";
 import { CMD } from "./commands";
 import { type BgpPeer, type DeviceCfg, type EtherChannel, type IfBriefRow, type OspfNeighbor, type TrunkPort, normIf, ospfFor } from "./parsers";
+import { type ExtraInput, extraFindings } from "./checks-extra";
 import { driverFor } from "./platforms";
 import type { DeviceSnapshot, Finding, IfaceObservation, PingResult, Severity } from "./types";
 
@@ -64,11 +65,13 @@ const ev = (d: Dev, cmd: string, line: string) => `${d.node.label}# ${d.raw[cmd]
 const briefLine = (d: Dev, r: IfBriefRow) => ev(d, CMD.brief, `${r.name} ${r.ip ?? "unassigned"} ${r.status}/${r.protocol}`);
 
 function mk(f: Omit<Finding, "id">): Finding {
-  const key = [f.kind, f.deviceId, f.interface ?? "", f.peer?.deviceId ?? "", f.peer?.interface ?? "", f.kind === "duplicate-ip" || f.kind === "duplicate-router-id" ? f.title : ""].join("|");
+  const key = [f.kind, f.deviceId, f.interface ?? "", f.peer?.deviceId ?? "", f.peer?.interface ?? "", f.kind === "duplicate-ip" || f.kind === "duplicate-router-id" || /^(acl|hygiene|stp|static-route|bgp-as)/.test(f.kind) ? f.title : ""].join("|");
   return { id: createHash("sha1").update(key).digest("hex").slice(0, 12), ...f };
 }
 
-export function analyse(topology: Topology, snapshots: Map<string, DeviceSnapshot>, pings: PingResult[]): Analysis {
+export type AnalyseOptions = { /** Run the security and hygiene baseline. Off unless asked, so callers that predate it see no new findings. */ compliance?: boolean };
+
+export function analyse(topology: Topology, snapshots: Map<string, DeviceSnapshot>, pings: PingResult[], opts: AnalyseOptions = {}): Analysis {
   const nodes = new Map(topology.nodes.map((n) => [n.id, n]));
   const devs = new Map<string, Dev>();
   for (const [id, snap] of snapshots) { const n = nodes.get(id); if (n) devs.set(id, build(n, snap)); }
@@ -302,6 +305,15 @@ export function analyse(topology: Topology, snapshots: Map<string, DeviceSnapsho
       }
     }
   }
+
+  // ---- spanning tree, static routes, ACLs and the security baseline (IOS-style devices) ----------------------
+  const extra: ExtraInput[] = [];
+  for (const [id, snap] of snapshots) {
+    const d = devs.get(id);
+    if (!d || (d.node.platform ?? "ios") !== "ios") continue;
+    extra.push({ node: d.node, configText: usable(snap, "config"), cfg: d.cfg, brief: d.brief, stpText: ran(snap, "stp"), bgpText: usable(snap, "bgp") });
+  }
+  findings.push(...extraFindings(extra, topology.links, mk, { compliance: opts.compliance ?? false }));
 
   const seen = new Set<string>();
   const unique = findings.filter((f) => !seen.has(f.id) && seen.add(f.id));

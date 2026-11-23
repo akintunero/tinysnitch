@@ -9,12 +9,15 @@ export default function Diagnostics() {
   const { status, settings, labs } = useApp();
   if (!status || !settings) return <p className="text-soft">Loading...</p>;
 
-  if (status.mcp.status !== "connected") {
+  // Only a network that comes from CML needs the CML connection; an inventory, Ansible or NetBox network is read directly.
+  const selected = labs.labs.find((l) => l.id === settings.selectedLabId);
+  const needsCml = !selected || (selected.providerKind ?? "cml") === "cml";
+  if (needsCml && settings.selectedLabId && status.mcp.status !== "connected") {
     return (
       <>
         <PageHeader title="Diagnostics" />
         <EmptyState title="The CML MCP connection needs attention" action={<Link href="/settings" className="text-[13px] underline">Open Settings</Link>}>
-          {status.mcp.configError ?? status.mcp.lastError ?? "Tiny Snitch is not connected to the CML MCP server yet."} Diagnostics read live devices, so they need the connection.
+          {status.mcp.configError ?? status.mcp.lastError ?? "Tiny Snitch is not connected to the CML MCP server yet."} Diagnostics read live devices, so they need it.
         </EmptyState>
       </>
     );
@@ -23,7 +26,7 @@ export default function Diagnostics() {
     return (
       <>
         <PageHeader title="Diagnostics" />
-        <EmptyState title="No lab selected" action={<Link href="/labs" className="text-[13px] underline">Choose a lab</Link>}>Pick a lab to check its running devices.</EmptyState>
+        <EmptyState title="No network selected" action={<Link href="/networks" className="text-[13px] underline">Choose a network</Link>}>Pick a network to check its running devices.</EmptyState>
       </>
     );
   }

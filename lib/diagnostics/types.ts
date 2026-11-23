@@ -53,4 +53,6 @@ export type RunSummary = {
   interfaces: Record<string, Record<string, IfaceObservation>>;
   pings: { linkId: string; ok: boolean; successRate: number | null }[];
   notRun: string[];
+  /** Findings by severity at the end of this run, so history can be drawn without re-reading every finding. */
+  counts?: { critical: number; warning: number; info: number; suspected: number };
 };
