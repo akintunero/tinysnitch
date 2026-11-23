@@ -7,7 +7,7 @@ import { normIf } from "../diagnostics/parsers";
  */
 export type ConfigBlocks = Map<string, string[]>;
 
-const VOLATILE = /^(building configuration|current configuration\s*:|!|using \d+ out of|last configuration change|nvram config last updated|no configuration change since|ntp clock-period|end$|version\s|\*|boot-(start|end)-marker)/i;
+export const VOLATILE = /^(building configuration|current configuration\s*:|!|using \d+ out of|last configuration change|nvram config last updated|no configuration change since|ntp clock-period|end$|version\s|\*|boot-(start|end)-marker)/i;
 
 /** Interface names are written in full so `Gi0/1` and `GigabitEthernet0/1` are one block. */
 export function headerKey(line: string): string {
@@ -47,7 +47,7 @@ export function parseBlocks(text: string): ConfigBlocks {
 
 /** The line a `no ...` command removes, matched by prefix: `no ip address` removes any `ip address ...`. */
 const stripNo = (c: string) => c.replace(/^no\s+/i, "");
-const OPENS_BLOCK = /^(interface|router|line|vlan|ip access-list|ipv6 access-list|route-map|class-map|policy-map|vrf definition|vrf context|key chain|control-plane|address-family|spanning-tree mst)\b/i;
+export const OPENS_BLOCK = /^(interface|router|line|vlan|ip access-list|ipv6 access-list|route-map|class-map|policy-map|vrf definition|vrf context|key chain|control-plane|address-family|spanning-tree mst)\b/i;
 
 export type Expectation = { block: string; line: string; kind: "present" | "absent"; command: string };
 

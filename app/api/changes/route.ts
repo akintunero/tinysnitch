@@ -27,6 +27,7 @@ const body = z.object({
   title: z.string().trim().min(1).max(120),
   intent: z.string().max(2000).default(""),
   devices: z.array(z.object({ device: z.string().min(1), commands: z.array(z.string().max(400)).min(1).max(300) })).min(1).max(20),
+  rollout: z.object({ mode: z.enum(["all", "staged"]), canary: z.number().int().min(1).max(19).default(1), pauseAfterCanary: z.boolean().default(true) }).optional(),
 }).strict();
 
 /** Files a proposal. Nothing is sent to any device. */
@@ -34,7 +35,7 @@ export const POST = route(async (req) => {
   const b = await readJson(req, body);
   const { db } = getContext();
   try {
-    return json(await proposeChange({ scopeId: scopeOf(req, db, b.scopeId), title: b.title, intent: b.intent, source: "user", devices: b.devices }), 201);
+    return json(await proposeChange({ scopeId: scopeOf(req, db, b.scopeId), title: b.title, intent: b.intent, source: "user", devices: b.devices, rollout: b.rollout }), 201);
   } catch (e) {
     if (e instanceof ChangeError) throw new HttpError(e.status, e.message);
     throw e;

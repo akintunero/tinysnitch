@@ -9,9 +9,13 @@ import { openFindings } from "../diagnostics/store";
 import { providerFor } from "../providers/registry";
 import { getContext } from "../server/context";
 import { CLI } from "../transport/ssh";
+import { countUsers, otherApprovers } from "../auth/store";
+import { recordBackup } from "../backup/store";
+import { currentActor } from "../security/actor";
 import { managementCutoff, modelFor } from "./models";
+import { describeWindow, inWindow } from "./window";
 import {
-  type Change, type ChangeResult, type DeviceOutcome, type DevicePlan, createChange, getChange, updateChange,
+  type Change, type ChangeResult, type DeviceOutcome, type DevicePlan, type Rollout, createChange, getChange, updateChange,
 } from "./store";
 
 export class ChangeError extends Error {
@@ -88,29 +92,42 @@ export function autoApprovable(change: Pick<Change, "environment" | "plan" | "so
   if (lines > LIMITS.autopilotLines) reasons.push(`It has ${lines} lines; Autopilot allows at most ${LIMITS.autopilotLines}.`);
   if (change.plan.devices.length > LIMITS.autopilotDevices) reasons.push(`It touches ${change.plan.devices.length} devices; Autopilot allows at most ${LIMITS.autopilotDevices}.`);
   if (change.plan.devices.some((d) => d.risks.some((r) => r.risk === "high"))) reasons.push("It contains high-risk lines, which always need a person's approval.");
+  if (change.plan.rollout?.mode === "staged" && change.plan.rollout.pauseAfterCanary) reasons.push("It pauses after the canary for a person to continue it.");
   return { ok: reasons.length === 0, reasons };
 }
 
-export async function proposeChange(input: { scopeId: string; title: string; intent: string; source: Change["source"]; devices: { device: string; commands: string[] }[] }): Promise<Change> {
+export async function proposeChange(input: { scopeId: string; title: string; intent: string; source: Change["source"]; devices: { device: string; commands: string[] }[]; rollout?: Rollout; createdBy?: string | null }): Promise<Change> {
   const ctx = getContext();
   const { provider } = providerFor(input.scopeId);
   if (!provider) throw new ChangeError("No inventory provides that network.", 404);
   const topology = await provider.getTopology(input.scopeId);
   const v = validatePlan(topology.nodes, provider, input.devices, provider.transport(input.scopeId));
   const environment: Environment = topology.lab.environment ?? "lab";
-  const change = createChange(ctx.db, { scopeId: input.scopeId, environment, title: input.title.trim().slice(0, 120) || "Untitled change", intent: input.intent.trim().slice(0, 2000), source: input.source, plan: { devices: v.devices, warnings: v.warnings } });
+  // Several devices in production go canary-first unless the proposer chose otherwise.
+  let rollout: Rollout | undefined = input.rollout;
+  if (rollout?.mode === "staged" && v.devices.length < 2) throw new ChangeError("A staged rollout needs at least two devices.", 400);
+  if (rollout?.mode === "staged" && (rollout.canary < 1 || rollout.canary >= v.devices.length)) throw new ChangeError(`The canary must be between 1 and ${v.devices.length - 1} device(s).`, 400);
+  if (!rollout && environment === "production" && v.devices.length > 1) rollout = { mode: "staged", canary: 1, pauseAfterCanary: true };
+  const change = createChange(ctx.db, { scopeId: input.scopeId, environment, title: input.title.trim().slice(0, 120) || "Untitled change", intent: input.intent.trim().slice(0, 2000), source: input.source, plan: { devices: v.devices, warnings: v.warnings, ...(rollout ? { rollout } : {}) }, createdBy: input.createdBy ?? currentActor()?.username ?? null });
   addAudit(ctx.db, { kind: "configuration", actor: input.source === "assistant" ? "claude" : "user", summary: `Proposed change "${change.title}" for ${v.devices.length} device(s) (${environment})`, data: { changeId: change.id, scopeId: input.scopeId, devices: v.devices.map((d) => ({ device: d.label, lines: d.commands.length })) } });
   return change;
 }
 
-export function approveChange(id: string, actor = "user"): Change {
+export function approveChange(id: string, actorIn?: string): Change {
+  const actor = actorIn ?? currentActor()?.username ?? "user";
   const ctx = getContext();
   const c = getChange(ctx.db, id);
   if (!c) throw new ChangeError("No such change.", 404);
   if (c.status !== "proposed") throw new ChangeError(`This change is ${c.status.replace("_", " ")}, so it cannot be approved.`);
   if (modeOf(ctx.db) === "suggest") throw new ChangeError("Suggest mode only drafts changes for review. Switch to Approve-and-deploy in Settings to apply them.");
+  // Four eyes: on a production network the proposer may not approve their own change, as long as someone else could.
+  let note = "";
+  if (c.environment === "production" && getSettings(ctx.db).requireSecondApprover && countUsers(ctx.db) > 0 && c.createdBy && c.createdBy.toLowerCase() === actor.toLowerCase()) {
+    if (otherApprovers(ctx.db, actor) > 0) throw new ChangeError("This is a production network: a second person has to approve a change, and you proposed this one. Ask another approver.", 403);
+    note = " (approved by its proposer: no other approver exists)";
+  }
   const out = updateChange(ctx.db, id, { status: "approved", approvedAt: new Date().toISOString(), approvedBy: actor });
-  addAudit(ctx.db, { kind: "approval", actor, summary: `Approved change "${c.title}"`, data: { changeId: id, environment: c.environment } });
+  addAudit(ctx.db, { kind: "approval", actor: actor === "user" ? "user" : `user:${actor}`, summary: `Approved change "${c.title}"${note}`, data: { changeId: id, environment: c.environment } });
   return out;
 }
 
@@ -146,7 +163,7 @@ export function resetChangeLocks(): void {
 
 type Env = { db: Db; provider: InventoryProvider; transport: DeviceTransport; nodes: Map<string, TopoNode> };
 
-async function readConfig(t: DeviceTransport, ref: DeviceRef): Promise<{ ok: true; text: string } | { ok: false; reason: string }> {
+export async function readConfig(t: DeviceTransport, ref: DeviceRef): Promise<{ ok: true; text: string } | { ok: false; reason: string }> {
   const r = await t.run(ref, driverFor(ref.platform)?.commands.config ?? "show running-config");
   if (!r.ok) return { ok: false, reason: r.text.split("\n")[0].slice(0, 200) };
   if (!r.text.trim() || REFUSED.test(r.text.split("\n").find((l) => l.trim()) ?? "")) return { ok: false, reason: "The device did not return its configuration." };
@@ -154,6 +171,15 @@ async function readConfig(t: DeviceTransport, ref: DeviceRef): Promise<{ ok: tru
 }
 
 export { managementCutoff };
+
+/** Keeps a version of what a device looked like at a point in a change. A storage problem must never disturb the change itself. */
+function keepVersion(db: Db, scopeId: string, device: string, config: string, source: string): void {
+  try {
+    recordBackup(db, { scopeId, device, config, source });
+  } catch {
+    /* the history is a convenience; the change goes on */
+  }
+}
 
 async function rollbackDevice(env: Env, change: Change, d: DevicePlan, out: DeviceOutcome): Promise<boolean> {
   const snap = change.snapshot?.[d.label];
@@ -170,6 +196,7 @@ async function rollbackDevice(env: Env, change: Change, d: DevicePlan, out: Devi
   if (!pushed.ok) { out.steps.push(`Rollback was rejected at "${pushed.failedAt ?? "?"}": ${pushed.text.split("\n").slice(-2).join(" ").slice(0, 200)}`); out.rolledBack = false; return false; }
   const after = await readConfig(env.transport, ref);
   if (!after.ok) { out.steps.push(`Rolled back, but the result could not be read to confirm: ${after.reason}`); out.rolledBack = false; return false; }
+  keepVersion(env.db, change.scopeId, d.label, after.text, `rollback:${change.id}`);
   // Only the parts this change touched are compared; drift elsewhere is not this change's business.
   const diff = model.remaining(snap, after.text, d.commands);
   out.remaining = diff;
@@ -190,121 +217,195 @@ async function resolveEnv(change: Change): Promise<Env> {
   return { db: ctx.db, provider, transport: provider.transport(change.scopeId), nodes: new Map(topology.nodes.map((n) => [n.id, n])) };
 }
 
-/**
- * Applies an approved change: snapshot every device first (and stop if any cannot be read), push device by device,
- * verify against a fresh read of each device, re-run diagnostics to catch new problems, and undo the change itself if
- * the push fails. Nothing is reported as done that was not read back from the device.
- */
+/** How a change is rolled out: all at once, or a canary first. A staged rollout needs at least two devices. */
+export function rolloutOf(c: Pick<Change, "plan">): { staged: boolean; canary: number; pause: boolean } {
+  const r = c.plan.rollout;
+  const n = c.plan.devices.length;
+  if (!r || r.mode !== "staged" || n < 2) return { staged: false, canary: n, pause: false };
+  return { staged: true, canary: Math.min(Math.max(1, Math.floor(r.canary)), n - 1), pause: r.pauseAfterCanary };
+}
+
+/** Someone applying a production change outside its maintenance window says why; that is kept in the audit log. */
+export type Override = { reason: string };
+
+function checkWindow(c: Change, override?: Override, audit = true, now = new Date()): void {
+  const ctx = getContext();
+  if (c.environment !== "production") return;
+  const w = getSettings(ctx.db).maintenanceWindow;
+  if (!w.enabled || inWindow(w, now)) return;
+  if (!override) throw new ChangeError(`Outside the maintenance window (${describeWindow(w)}). Schedule it for the window, or an administrator can apply it now and give a reason.`);
+  const reason = override.reason.trim();
+  if (reason.length < 10) throw new ChangeError("Applying outside the maintenance window needs a reason of at least 10 characters.", 400);
+  if (audit) addAudit(ctx.db, { kind: "approval", actor: "user", summary: `Maintenance window overridden for "${c.title}": ${reason.slice(0, 200)}`, data: { changeId: c.id, window: describeWindow(w) } });
+}
+
 /** The checks that must pass before a deployment may start. The API runs them before going to the background. */
-export function assertDeployable(id: string): Change {
+export function assertDeployable(id: string, override?: Override, audit = true): Change {
   const ctx = getContext();
   const c = getChange(ctx.db, id);
   if (!c) throw new ChangeError("No such change.", 404);
   if (c.status !== "approved") throw new ChangeError(c.status === "proposed" ? "This change has not been approved yet." : `This change is ${c.status.replace("_", " ")}, so it cannot be deployed.`);
   if (modeOf(ctx.db) === "suggest") throw new ChangeError("Suggest mode only drafts changes for review. Switch to Approve-and-deploy in Settings to apply them.");
   if (busy.has(c.scopeId)) throw new ChangeError("Another change is being applied to this network. Wait for it to finish.");
+  checkWindow(c, override, audit);
   return c;
 }
 
-export async function deployChange(id: string): Promise<Change> {
+/** The checks before the rest of a staged change is applied. */
+export function assertContinuable(id: string, override?: Override, audit = true): Change {
   const ctx = getContext();
-  const c0 = assertDeployable(id);
+  const c = getChange(ctx.db, id);
+  if (!c) throw new ChangeError("No such change.", 404);
+  if (c.status !== "paused") throw new ChangeError(`This change is ${c.status.replace("_", " ")}, so there is nothing to continue.`);
+  if (!c.snapshot) throw new ChangeError("No snapshot was taken, so this change cannot be continued safely.");
+  if (modeOf(ctx.db) === "suggest") throw new ChangeError("Suggest mode does not change devices.");
+  if (busy.has(c.scopeId)) throw new ChangeError("Another change is being applied to this network. Wait for it to finish.");
+  checkWindow(c, override, audit);
+  return c;
+}
+
+export async function deployChange(id: string, override?: Override): Promise<Change> {
+  return execute(id, "start", override);
+}
+
+/** Applies the devices a staged change held back, after the canary was applied and verified. */
+export async function continueChange(id: string, override?: Override): Promise<Change> {
+  return execute(id, "continue", override);
+}
+
+/**
+ * Applies an approved change: snapshot every device first (and stop if any cannot be read), push device by device,
+ * verify against a fresh read of each device, re-run diagnostics to catch new problems, and undo the change itself if
+ * the push fails. A staged change does this for its canary devices first, and may pause there for a person to continue.
+ * Nothing is reported as done that was not read back from the device.
+ */
+async function execute(id: string, phase: "start" | "continue", override?: Override): Promise<Change> {
+  const ctx = getContext();
+  const c0 = phase === "start" ? assertDeployable(id, override) : assertContinuable(id, override);
   const mode = modeOf(ctx.db);
-  const result: ChangeResult = { startedAt: new Date().toISOString(), finishedAt: null, summary: "", devices: [], regressions: [], saved: false };
-  const outcomes = new Map<string, DeviceOutcome>(c0.plan.devices.map((d) => [d.label, emptyOutcome(d.label)]));
+  const ro = rolloutOf(c0);
+  const all = c0.plan.devices;
+  const canary = all.slice(0, ro.canary), rest = all.slice(ro.canary);
+  const groups: DevicePlan[][] = phase === "continue" ? [rest] : ro.staged ? (ro.pause ? [canary] : [canary, rest]) : [all];
+  const applied: DevicePlan[] = phase === "continue" ? [...canary] : []; // already on their devices from an earlier phase
+  const prior = c0.result;
+  const result: ChangeResult = { startedAt: prior?.startedAt ?? new Date().toISOString(), finishedAt: null, summary: "", devices: [], regressions: [...(prior?.regressions ?? [])], saved: false };
+  const outcomes = new Map<string, DeviceOutcome>(all.map((d) => [d.label, prior?.devices.find((x) => x.label === d.label) ?? emptyOutcome(d.label)]));
   const finish = (status: Change["status"], summary: string, snapshot?: Record<string, string>) => {
     result.finishedAt = new Date().toISOString();
     result.summary = summary;
-    result.devices = c0.plan.devices.map((d) => outcomes.get(d.label)!);
+    result.devices = all.map((d) => outcomes.get(d.label)!);
     addAudit(ctx.db, { kind: "configuration", actor: "system", summary: `Change "${c0.title}": ${status}. ${summary}`.slice(0, 480), data: { changeId: id, status, environment: c0.environment } });
     return updateChange(ctx.db, id, { status, result, ...(snapshot ? { snapshot } : {}) });
   };
   // Taken straight before the try, with nothing in between that could throw, so it is always released in the finally.
   const release = acquireNetworkLock(c0.scopeId);
   try {
-    updateChange(ctx.db, id, { status: "deploying" });
-    addAudit(ctx.db, { kind: "configuration", actor: "system", summary: `Deploying change "${c0.title}" to ${c0.plan.devices.length} device(s)`, data: { changeId: id } });
+    updateChange(ctx.db, id, { status: "deploying", scheduledFor: null });
+    addAudit(ctx.db, { kind: "configuration", actor: "system", summary: `${phase === "continue" ? "Continuing" : "Deploying"} change "${c0.title}" to ${(phase === "continue" ? rest : all).length} device(s)${ro.staged ? " (staged)" : ""}`, data: { changeId: id } });
     const env = await resolveEnv(c0);
 
-    // 1. Snapshot everything before touching anything.
-    const snapshot: Record<string, string> = {};
-    for (const d of c0.plan.devices) {
+    // 1. Snapshot before touching anything. On a continue, the devices still to be changed are read again, because they
+    //    may have changed since the canary was applied; the canary's own snapshot is kept.
+    const snapshot: Record<string, string> = { ...(c0.snapshot ?? {}) };
+    for (const d of phase === "continue" ? rest : all) {
       const node = env.nodes.get(d.deviceId);
       const out = outcomes.get(d.label)!;
-      if (!node) return finish("failed", `${d.label} is no longer in the network. Nothing was changed.`);
+      const none = phase === "continue" ? "Nothing more was changed." : "Nothing was changed.";
+      const stop = (summary: string, snap?: Record<string, string>) => (phase === "continue" ? finish("paused", `${summary} The canary stays applied; try again or roll back.`) : finish("failed", summary, snap));
+      if (!node) return stop(`${d.label} is no longer in the network. ${none}`);
       const can = env.provider.inspectable(node);
-      if (!can.ok) { out.steps.push(can.reason); return finish("failed", `${d.label} cannot be reached: ${can.reason} Nothing was changed.`); }
+      if (!can.ok) { out.steps.push(can.reason); return stop(`${d.label} cannot be reached: ${can.reason} ${none}`); }
       const cfg = await readConfig(env.transport, nodeRef(node));
-      if (!cfg.ok) { out.steps.push(`Could not read the configuration first: ${cfg.reason}`); return finish("failed", `Could not take a snapshot of ${d.label} (${cfg.reason}). Nothing was changed.`); }
+      if (!cfg.ok) { out.steps.push(`Could not read the configuration first: ${cfg.reason}`); return stop(`Could not take a snapshot of ${d.label} (${cfg.reason}). ${none}`); }
       snapshot[d.label] = cfg.text;
+      keepVersion(ctx.db, c0.scopeId, d.label, cfg.text, `pre-change:${id}`); // also shows if someone changed the device since the last backup
       out.steps.push("Snapshot of the running configuration taken.");
       const cut = modelFor(d.platform).cutoff(cfg.text, d.platform, node.address, d.commands);
-      if (cut) { out.steps.push(`Stopped: ${cut}.`); return finish("failed", `Refused to apply: ${d.label} would lose contact with Tiny Snitch (${cut}). Nothing was changed.`, snapshot); }
+      if (cut) { out.steps.push(`Stopped: ${cut}.`); return stop(`Refused to apply: ${d.label} would lose contact with Tiny Snitch (${cut}). ${none}`, snapshot); }
     }
     updateChange(ctx.db, id, { snapshot });
-    const before = new Set(openFindings(ctx.db, c0.scopeId).map((f) => f.id));
     const change: Change = { ...c0, snapshot };
 
-    // 2. Push, device by device. Stop at the first failure and undo what was done.
-    const touched: DevicePlan[] = [];
-    for (const d of c0.plan.devices) {
-      const node = env.nodes.get(d.deviceId)!;
-      const out = outcomes.get(d.label)!;
-      touched.push(d);
-      const r = await env.transport.push(nodeRef(node), d.commands);
-      out.pushed = r.ok;
-      if (!r.ok) {
-        out.steps.push(`Rejected${r.failedAt ? ` at "${r.failedAt}"` : ""}: ${r.text.split("\n").filter((l) => l.trim()).slice(-2).join(" ").slice(0, 200)}`);
-        let allBack = true;
-        for (const t of touched) allBack = (await rollbackDevice(env, change, t, outcomes.get(t.label)!)) && allBack;
-        return finish(allBack ? "rolled_back" : "rollback_failed", allBack ? `${d.label} rejected the change, so it was rolled back everywhere. Nothing remains applied.` : `${d.label} rejected the change and the rollback did not fully restore every device. Review the steps below.`);
-      }
-      out.steps.push(`Applied ${d.commands.length} line(s).`);
-    }
+    for (const group of groups) {
+      const before = new Set(openFindings(ctx.db, c0.scopeId).map((f) => f.id));
+      const where = ro.staged ? (group === canary ? "canary " : "remaining ") : "";
 
-    // 3. Verify against a fresh read of every device.
-    let verifiedAll = true;
-    for (const d of c0.plan.devices) {
-      const node = env.nodes.get(d.deviceId)!;
-      const out = outcomes.get(d.label)!;
-      const after = await readConfig(env.transport, nodeRef(node));
-      if (!after.ok) { out.verified = false; out.steps.push(`Could not read the device back to verify: ${after.reason}`); verifiedAll = false; continue; }
-      const v = modelFor(d.platform).verify(d.commands, after.text);
-      out.verified = v.ok;
-      out.mismatches = v.mismatches;
-      out.steps.push(v.ok ? "Verified: every line is present in the running configuration." : `Not verified: ${v.mismatches.length} line(s) do not show in the running configuration.`);
-      if (!v.ok) verifiedAll = false;
-    }
-
-    // 4. Look for new problems with the same read-only checks as Diagnostics.
-    try {
-      const run = await runDiagnostics(c0.scopeId, { pings: true });
-      result.regressions = run.findings.filter((f) => !before.has(f.id) && f.severity !== "info").map((f) => ({ id: f.id, title: f.title, device: f.device, severity: f.severity }));
-    } catch (e) {
-      for (const o of outcomes.values()) o.steps.push(`Diagnostics could not be re-run afterwards: ${e instanceof Error ? e.message.slice(0, 120) : "unknown error"}`);
-    }
-
-    const criticalNew = result.regressions.some((r) => r.severity === "critical");
-    const autopilot = mode === "autopilot" && c0.environment === "lab";
-    if (autopilot && (!verifiedAll || criticalNew)) {
-      for (const d of c0.plan.devices) await rollbackDevice(env, change, d, outcomes.get(d.label)!);
-      const ok = c0.plan.devices.every((d) => outcomes.get(d.label)!.rolledBack);
-      return finish(ok ? "rolled_back" : "rollback_failed", `${!verifiedAll ? "Verification failed" : "New critical problems appeared"}, so Autopilot rolled the change back${ok ? "" : ", but not every device was restored"}.`);
-    }
-    if (!verifiedAll) return finish("failed", "The change was applied but could not be fully verified. Review the steps and roll back if it is wrong.");
-    // Platforms with provisional commits revert by themselves unless the change is confirmed: do it only now that it is verified.
-    if (env.transport.confirm) {
-      let confirmedAll = true;
-      for (const d of c0.plan.devices) {
+      // 2. Push, device by device. Stop at the first failure and undo everything this change put on any device.
+      const touched: DevicePlan[] = [];
+      for (const d of group) {
+        const node = env.nodes.get(d.deviceId)!;
         const out = outcomes.get(d.label)!;
-        const r = await env.transport.confirm(nodeRef(env.nodes.get(d.deviceId)!));
-        if (r.ok && r.text === "Nothing to confirm.") continue; // this device's push was final already
-        out.steps.push(r.ok ? "Confirmed: the change is now permanent on the device." : `Could not confirm the change: ${r.text.split("\n")[0].slice(0, 160)}. The device will revert it by itself when its confirm timer ends.`);
-        confirmedAll = confirmedAll && r.ok;
+        touched.push(d);
+        const r = await env.transport.push(nodeRef(node), d.commands);
+        out.pushed = r.ok;
+        if (!r.ok) {
+          out.steps.push(`Rejected${r.failedAt ? ` at "${r.failedAt}"` : ""}: ${r.text.split("\n").filter((l) => l.trim()).slice(-2).join(" ").slice(0, 200)}`);
+          let allBack = true;
+          for (const t of [...applied, ...touched]) allBack = (await rollbackDevice(env, change, t, outcomes.get(t.label)!)) && allBack;
+          return finish(allBack ? "rolled_back" : "rollback_failed", allBack
+            ? `${d.label} rejected the change${ro.staged ? ` (${where}devices)` : ""}, so it was rolled back everywhere. Nothing remains applied.`
+            : `${d.label} rejected the change and the rollback did not fully restore every device. Review the steps below.`);
+        }
+        out.steps.push(`Applied ${d.commands.length} line(s).`);
       }
-      if (!confirmedAll) return finish("failed", "The change was applied and verified, but could not be made permanent on every device; devices that were not confirmed will revert it on their own. Check them before trying again.");
+
+      // 3. Verify against a fresh read of every device in this group.
+      let verifiedAll = true;
+      for (const d of group) {
+        const node = env.nodes.get(d.deviceId)!;
+        const out = outcomes.get(d.label)!;
+        const after = await readConfig(env.transport, nodeRef(node));
+        if (!after.ok) { out.verified = false; out.steps.push(`Could not read the device back to verify: ${after.reason}`); verifiedAll = false; continue; }
+        keepVersion(ctx.db, c0.scopeId, d.label, after.text, `change:${id}`);
+        const v = modelFor(d.platform).verify(d.commands, after.text);
+        out.verified = v.ok;
+        out.mismatches = v.mismatches;
+        out.steps.push(v.ok ? "Verified: every line is present in the running configuration." : `Not verified: ${v.mismatches.length} line(s) do not show in the running configuration.`);
+        if (!v.ok) verifiedAll = false;
+      }
+
+      // 4. Look for new problems with the same read-only checks as Diagnostics.
+      try {
+        const run = await runDiagnostics(c0.scopeId, { pings: true });
+        result.regressions.push(...run.findings.filter((f) => !before.has(f.id) && f.severity !== "info").map((f) => ({ id: f.id, title: f.title, device: f.device, severity: f.severity })));
+      } catch (e) {
+        for (const o of outcomes.values()) o.steps.push(`Diagnostics could not be re-run afterwards: ${e instanceof Error ? e.message.slice(0, 120) : "unknown error"}`);
+      }
+
+      const criticalNew = result.regressions.some((r) => r.severity === "critical");
+      const autopilot = mode === "autopilot" && c0.environment === "lab";
+      if (autopilot && (!verifiedAll || criticalNew)) {
+        const everything = [...applied, ...group];
+        for (const d of everything) await rollbackDevice(env, change, d, outcomes.get(d.label)!);
+        const ok = everything.every((d) => outcomes.get(d.label)!.rolledBack);
+        return finish(ok ? "rolled_back" : "rollback_failed", `${!verifiedAll ? "Verification failed" : "New critical problems appeared"}, so Autopilot rolled the change back${ok ? "" : ", but not every device was restored"}.`);
+      }
+      if (!verifiedAll) {
+        return finish("failed", ro.staged && group === canary
+          ? "The canary was applied but could not be fully verified. The other devices were not touched. Review the steps and roll back if it is wrong."
+          : "The change was applied but could not be fully verified. Review the steps and roll back if it is wrong.");
+      }
+
+      // Platforms with provisional commits revert by themselves unless the change is confirmed: do it only now that it is verified.
+      if (env.transport.confirm) {
+        let confirmedAll = true;
+        for (const d of group) {
+          const out = outcomes.get(d.label)!;
+          const r = await env.transport.confirm(nodeRef(env.nodes.get(d.deviceId)!));
+          if (r.ok && r.text === "Nothing to confirm.") continue; // this device's push was final already
+          out.steps.push(r.ok ? "Confirmed: the change is now permanent on the device." : `Could not confirm the change: ${r.text.split("\n")[0].slice(0, 160)}. The device will revert it by itself when its confirm timer ends.`);
+          confirmedAll = confirmedAll && r.ok;
+        }
+        if (!confirmedAll) return finish("failed", "The change was applied and verified, but could not be made permanent on every device; devices that were not confirmed will revert it on their own. Check them before trying again.");
+      }
+      applied.push(...group);
     }
-    return finish("verified", result.regressions.length ? `Applied and verified, but ${result.regressions.length} new finding(s) appeared. Review them and roll back if the change caused them.` : "Applied and verified on every device. No new findings.");
+
+    if (phase === "start" && ro.staged && ro.pause) {
+      return finish("paused", `Applied and verified on the canary (${canary.map((d) => d.label).join(", ")}). The other ${rest.length} device(s) have not been touched. Check the canary, then continue or roll back.`);
+    }
+    return finish("verified", result.regressions.length ? `Applied and verified, but ${result.regressions.length} new finding(s) appeared. Review them and roll back if the change caused them.` : `Applied and verified on every device${ro.staged ? ", canary first" : ""}. No new findings.`);
   } catch (e) {
     return finish("failed", `The deployment stopped unexpectedly: ${e instanceof Error ? e.message.slice(0, 160) : "unknown error"}. Check each device before trying again.`);
   } finally {
@@ -312,11 +413,34 @@ export async function deployChange(id: string): Promise<Change> {
   }
 }
 
+/**
+ * Sets, or with null clears, the time an approved change will be applied by the scheduler. The time must be in the
+ * future, and for a production network with a maintenance window it must fall inside it.
+ */
+export function scheduleChange(id: string, at: Date | null, now = new Date()): Change {
+  const ctx = getContext();
+  const c = getChange(ctx.db, id);
+  if (!c) throw new ChangeError("No such change.", 404);
+  if (c.status !== "approved") throw new ChangeError(c.status === "proposed" ? "Approve the change before scheduling it." : `This change is ${c.status.replace("_", " ")}, so it cannot be scheduled.`);
+  if (modeOf(ctx.db) === "suggest") throw new ChangeError("Suggest mode does not change devices.");
+  if (at === null) {
+    addAudit(ctx.db, { kind: "configuration", actor: "user", summary: `Unscheduled change "${c.title}"`, data: { changeId: id } });
+    return updateChange(ctx.db, id, { scheduledFor: null });
+  }
+  if (!Number.isFinite(at.getTime())) throw new ChangeError("That is not a valid time.", 400);
+  if (at.getTime() < now.getTime() + 30_000) throw new ChangeError("Schedule it at least a minute from now.", 400);
+  if (at.getTime() > now.getTime() + 30 * 86_400_000) throw new ChangeError("A change can be scheduled at most 30 days ahead.", 400);
+  const w = getSettings(ctx.db).maintenanceWindow;
+  if (c.environment === "production" && w.enabled && !inWindow(w, at)) throw new ChangeError(`That time is outside the maintenance window (${describeWindow(w)}). Pick a time inside it.`, 400);
+  addAudit(ctx.db, { kind: "configuration", actor: "user", summary: `Scheduled change "${c.title}" for ${at.toISOString()}`, data: { changeId: id } });
+  return updateChange(ctx.db, id, { scheduledFor: at.toISOString() });
+}
+
 export function assertRollbackable(id: string): Change {
   const ctx = getContext();
   const c = getChange(ctx.db, id);
   if (!c) throw new ChangeError("No such change.", 404);
-  if (!["verified", "failed", "rollback_failed"].includes(c.status)) throw new ChangeError(`This change is ${c.status.replace("_", " ")}, so there is nothing to roll back.`);
+  if (!["verified", "failed", "rollback_failed", "paused"].includes(c.status)) throw new ChangeError(`This change is ${c.status.replace("_", " ")}, so there is nothing to roll back.`);
   if (!c.snapshot) throw new ChangeError("No snapshot was taken before this change, so it cannot be rolled back automatically.");
   if (modeOf(ctx.db) === "suggest") throw new ChangeError("Suggest mode does not change devices.");
   if (busy.has(c.scopeId)) throw new ChangeError("Another change is being applied to this network. Wait for it to finish.");
