@@ -19,6 +19,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   } catch {
     /* non-JSON body */
   }
+  if (res.status === 401 && typeof window !== "undefined" && data?.code !== "bad_login") window.dispatchEvent(new Event("ts-auth"));
   if (!res.ok) throw new ClientError(data?.error ?? `Request failed (${res.status})`, res.status, data?.code);
   return data as T;
 }

@@ -15,4 +15,4 @@ export const PUT = route(async (req) => {
   const changed = Object.keys(patch).filter((k) => JSON.stringify((before as Record<string, unknown>)[k]) !== JSON.stringify((after as Record<string, unknown>)[k]));
   if (changed.length) addAudit(db, { kind: "settings", actor: "user", summary: `Changed settings: ${changed.join(", ")}`, data: Object.fromEntries(changed.map((k) => [k, (after as Record<string, unknown>)[k]])) });
   return json(after);
-}, { write: true });
+}, { write: true, role: "admin", sessionOnly: true });

@@ -27,7 +27,7 @@ export type Scope = {
   owner: string | null;
 };
 
-export type ProviderKind = "cml" | "static" | "netbox" | "discovery";
+export type ProviderKind = "cml" | "static" | "netbox" | "discovery" | "ansible";
 
 export type DeviceRef = { id: string; label: string; kind: NodeKind; platform: Platform };
 
@@ -59,6 +59,11 @@ export interface DeviceTransport {
    * never confirmed reverts by itself on the device. Absent where a push is final.
    */
   confirm?(device: DeviceRef): Promise<CommandOutcome>;
+  /**
+   * Asks the device whether it would accept these lines, without keeping them (Junos: load, commit check, discard).
+   * Absent where the platform has no such check; null from a transport that has none for this device.
+   */
+  dryRun?(device: DeviceRef, commands: string[]): Promise<CommandOutcome | null>;
   /** Copies the running configuration to startup so it survives a reload. A separate, explicit step. */
   save(device: DeviceRef): Promise<CommandOutcome>;
 }

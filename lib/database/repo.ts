@@ -1,3 +1,4 @@
+import { actorName } from "../security/actor";
 import { redactDeep, redactSecrets } from "../security/redact";
 import { DEFAULT_SETTINGS, type Settings, type SettingsPatch, settingsSchema } from "../settings";
 import type { Db } from "./db";
@@ -59,7 +60,7 @@ export function hostKeyStore(db: Db) {
 }
 
 export type AuditKind =
-  | "settings" | "mcp" | "tool_call" | "claude" | "lab" | "request" | "diagnostic" | "configuration" | "approval" | "error";
+  | "settings" | "mcp" | "tool_call" | "claude" | "lab" | "request" | "diagnostic" | "configuration" | "approval" | "backup" | "auth" | "error";
 
 export type AuditEvent = { id: number; at: string; kind: AuditKind; actor: string; summary: string; data: unknown };
 
@@ -67,13 +68,29 @@ export type AuditEvent = { id: number; at: string; kind: AuditKind; actor: strin
 export function addAudit(db: Db, e: { kind: AuditKind; summary: string; actor?: string; data?: unknown }): void {
   const data = e.data === undefined ? null : JSON.stringify(redactDeep(e.data));
   db.prepare("INSERT INTO audit_events (at, kind, actor, summary, data_json) VALUES (?, ?, ?, ?, ?)").run(
-    new Date().toISOString(), e.kind, e.actor ?? "system", redactSecrets(e.summary).slice(0, 500), data,
+    new Date().toISOString(), e.kind, e.actor === "user" ? actorName() : (e.actor ?? "system"), redactSecrets(e.summary).slice(0, 500), data,
   );
 }
 
-export function listAudit(db: Db, limit = 200): AuditEvent[] {
-  const rows = db.prepare("SELECT id, at, kind, actor, summary, data_json FROM audit_events ORDER BY id DESC LIMIT ?").all(limit) as {
+/** How many background reads (page loads and polling) the log holds, so hiding them is never silent. */
+export function countBackgroundReads(db: Db): number {
+  return (db.prepare("SELECT COUNT(*) AS n FROM audit_events WHERE kind = 'tool_call' AND actor = 'system'").get() as { n: number }).n;
+}
+
+export function listAudit(db: Db, limit = 200, opts: { reads?: boolean } = { reads: true }): AuditEvent[] {
+  const where = opts.reads === false ? "WHERE NOT (kind = 'tool_call' AND actor = 'system')" : "";
+  const rows = db.prepare(`SELECT id, at, kind, actor, summary, data_json FROM audit_events ${where} ORDER BY id DESC LIMIT ?`).all(limit) as {
     id: number; at: string; kind: AuditKind; actor: string; summary: string; data_json: string | null;
   }[];
   return rows.map((r) => ({ id: r.id, at: r.at, kind: r.kind, actor: r.actor, summary: r.summary, data: r.data_json ? JSON.parse(r.data_json) : null }));
+}
+
+/**
+ * Trims the activity log. Only noise and age are ever cleared, never "everything": the log is the record of who changed
+ * what, so a person can drop the background reads or the entries older than a cut-off, and that is itself recorded.
+ */
+export function clearActivity(db: Db, mode: { reads: true } | { olderThanDays: number }): number {
+  if ("reads" in mode) return Number(db.prepare("DELETE FROM audit_events WHERE kind = 'tool_call' AND actor = 'system'").run().changes);
+  const cutoff = new Date(Date.now() - mode.olderThanDays * 86_400_000).toISOString();
+  return Number(db.prepare("DELETE FROM audit_events WHERE at < ?").run(cutoff).changes);
 }

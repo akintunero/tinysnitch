@@ -7,4 +7,4 @@ export const dynamic = "force-dynamic";
 export const POST = route(async () => {
   const c = await verifyClaude();
   return json(c, c.verification === "ok" ? 200 : 502);
-}, { write: true });
+}, { write: true, role: "admin" });
