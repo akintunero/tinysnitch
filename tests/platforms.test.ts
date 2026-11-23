@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { modelFor } from "@/lib/changes/models";
-import { approveChange, deployChange, proposeChange, rollbackChange } from "@/lib/changes/engine";
+import { approveChange, deployChange, proposeChange, resetChangeLocks, rollbackChange } from "@/lib/changes/engine";
 import { renderBaseline } from "@/lib/changes/ztp";
 import { assessLine } from "@/lib/core/safety";
 import type { DeviceRef } from "@/lib/core/types";
@@ -249,7 +249,7 @@ describe("NETCONF transport (Junos)", () => {
 
 describe("the change workflow over each API transport", () => {
   let devs: { close: () => void }[] = [];
-  afterEach(() => { for (const d of devs) d.close(); devs = []; setProviders(null); setContext(undefined); });
+  afterEach(() => { for (const d of devs) d.close(); devs = []; setProviders(null); setContext(undefined); resetChangeLocks(); });
 
   function boot(device: string, mode: "approve" | "autopilot" = "approve") {
     process.env.TS_TEST_PW = "secret";

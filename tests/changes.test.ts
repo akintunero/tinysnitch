@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { expectations, parseBlocks, remainingDifferences, rollbackCommands, touchedScope, verifyApplied } from "@/lib/changes/config-diff";
-import { ChangeError, approveChange, deployChange, managementCutoff, proposeAndMaybeApply, proposeChange, rejectChange, rollbackChange, saveChange } from "@/lib/changes/engine";
+import { ChangeError, acquireNetworkLock, approveChange, autoApprovable, deployChange, isNetworkBusy, managementCutoff, proposeAndMaybeApply, proposeChange, rejectChange, resetChangeLocks, rollbackChange, saveChange } from "@/lib/changes/engine";
 import { getChange } from "@/lib/changes/store";
 import { openDatabase } from "@/lib/database/db";
 import { saveSettings } from "@/lib/database/repo";
@@ -96,7 +96,7 @@ describe("the change workflow against devices that hold real configuration", () 
     return db;
   }
   beforeEach(() => undefined);
-  afterEach(() => { r1?.close(); r2?.close(); setProviders(null); setContext(undefined); });
+  afterEach(() => { r1?.close(); r2?.close(); setProviders(null); setContext(undefined); resetChangeLocks(); });
 
   const both = [
     { device: "R1", commands: ["interface GigabitEthernet0/1", "description uplink", "ip address 10.0.1.1 255.255.255.0", "no shutdown"] },
@@ -252,6 +252,49 @@ describe("the change workflow against devices that hold real configuration", () 
     expect((await deployChange(c.id)).status).toBe("verified");
   });
 
+  it("never files a change that saves or runs commands from inside the configuration", async () => {
+    await boot({ mode: "autopilot" });
+    for (const bad of [["do write"], ["wr"], ["WRITE MEMORY"], ["tclsh"], ["event manager applet X", 'action 1.0 cli command "reload"'], ["interface Gi0/1", "Do  Wr  Mem"]]) {
+      await expect(propose([{ device: "R1", commands: bad }]), bad.join(" / ")).rejects.toBeInstanceOf(ChangeError);
+    }
+    expect(r1.sent).not.toContain("configure terminal");
+    expect(r1.sent.some((l) => /^(do\s+)?(wr|write)/i.test(l))).toBe(false);
+  });
+
+  it("Autopilot never applies event manager, kron or alias: they are high risk and wait for a person", async () => {
+    await boot({ mode: "autopilot" });
+    for (const line of ["alias exec s show version", "kron policy-list L", "event manager applet WATCH", "ALIAS exec x show ip route", "no kron policy-list L"]) {
+      const r = await proposeAndMaybeApply({ scopeId: SCOPE, title: "x", intent: "x", source: "assistant", devices: [{ device: "R1", commands: [line] }] });
+      expect(r.applied, line).toBe(false);
+      expect(r.change.status, line).toBe("proposed");
+      expect(r.note, line).toMatch(/high-risk/);
+    }
+    expect(r1.config).toEqual([]);
+    const c = await propose([{ device: "R1", commands: ["alias exec s show version"] }]);
+    expect(autoApprovable(c, "autopilot", true).ok).toBe(false);
+  });
+
+  it("a person can still approve a high-risk line in Approve mode, and it is flagged in the plan", async () => {
+    await boot();
+    const c = await propose([{ device: "R1", commands: ["alias exec s show version"] }]);
+    expect(c.plan.devices[0].risks[0].risk).toBe("high");
+    expect(c.plan.warnings.join()).toMatch(/high-risk/);
+  });
+
+  it("releases the network lock when a deployment fails, so the next change can run", async () => {
+    await boot();
+    const a = await propose([{ device: "R1", commands: ["interface Gi0/1", "description a"] }], "a");
+    approveChange(a.id);
+    r1.failShow.on = true;
+    expect((await deployChange(a.id)).status).toBe("failed");
+    expect(isNetworkBusy(SCOPE)).toBe(false);
+    r1.failShow.on = false;
+    const b = await propose([{ device: "R1", commands: ["interface Gi0/1", "description b"] }], "b");
+    approveChange(b.id);
+    expect((await deployChange(b.id)).status).toBe("verified");
+    expect(isNetworkBusy(SCOPE)).toBe(false);
+  });
+
   it("does not run two changes on one network at once", async () => {
     await boot();
     const a = await propose([{ device: "R1", commands: ["interface Gi0/1", "description a"] }], "a");
@@ -260,6 +303,37 @@ describe("the change workflow against devices that hold real configuration", () 
     const settled = await Promise.allSettled([deployChange(a.id), deployChange(b.id)]);
     expect(settled.filter((s) => s.status === "rejected")).toHaveLength(1);
     expect((settled.find((s) => s.status === "rejected") as PromiseRejectedResult).reason.message).toMatch(/Another change is being applied/);
+  });
+});
+
+describe("the per-network lock", () => {
+  afterEach(() => resetChangeLocks());
+
+  it("is held until released, and a second holder is visible as busy", () => {
+    const release = acquireNetworkLock("n1");
+    expect(isNetworkBusy("n1")).toBe(true);
+    expect(isNetworkBusy("n2")).toBe(false);
+    release();
+    expect(isNetworkBusy("n1")).toBe(false);
+  });
+
+  it("a late release from an abandoned run cannot free a lock a newer run now holds", () => {
+    const stale = acquireNetworkLock("n1");
+    resetChangeLocks(); // the abandoned run's test was reset
+    const fresh = acquireNetworkLock("n1");
+    stale(); // the abandoned run finishes late
+    expect(isNetworkBusy("n1")).toBe(true);
+    fresh();
+    expect(isNetworkBusy("n1")).toBe(false);
+  });
+
+  it("releasing twice is harmless", () => {
+    const a = acquireNetworkLock("n1");
+    a();
+    const b = acquireNetworkLock("n1");
+    a();
+    expect(isNetworkBusy("n1")).toBe(true);
+    b();
   });
 });
 
