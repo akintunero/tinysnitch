@@ -36,9 +36,9 @@ function PrivacyNotice({ mode, environment }: { mode: string; environment: strin
   return (
     <p className={`mt-3 border-l-2 pl-2.5 text-[12px] ${masked ? "border-line text-soft" : "border-warn text-warn"}`} data-testid="privacy-notice">
       {masked ? (
-        <><strong className="font-semibold text-ink">Your network data is pseudonymised before it reaches Claude.</strong> Addresses, device and network names, MAC addresses, public AS numbers, descriptions and banners are swapped for stand-ins, and passwords and keys are removed. The real values are put back here; the mapping never leaves this server. Names no one declared can slip through, so add customer and site names under{" "}</>
+        <><strong className="font-semibold text-ink">Your network data is pseudonymised before it reaches the AI model.</strong> Addresses, device and network names, MAC addresses, public AS numbers, descriptions and banners are swapped for stand-ins, and passwords and keys are removed. The real values are put back here; the mapping never leaves this server. Names no one declared can slip through, so add customer and site names under{" "}</>
       ) : (
-        <><strong className="font-semibold">Not masked for this network: Claude sees real addresses and names.</strong> Passwords and keys are still removed. To hide the rest, change it under{" "}</>
+        <><strong className="font-semibold">Not masked for this network: the AI model sees real addresses and names.</strong> Passwords and keys are still removed. To hide the rest, change it under{" "}</>
       )}
       <a href="/settings#privacy" className="underline underline-offset-2">Settings, Privacy</a>.
     </p>
