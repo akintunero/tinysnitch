@@ -209,12 +209,12 @@ Management Addresses:
       "10.0.0.3": { "show running-config | include ^hostname": "hostname C", "show cdp neighbors detail": cdp("B", "10.0.0.2", "Gi0/0", "Gi0/2", "Router"), "show lldp neighbors detail": "" },
     };
     const transportFor = (address: string) => ({ run: async (_d: unknown, c: string) => (tables[address]?.[c] !== undefined ? { ok: true, text: tables[address][c] } : { ok: false, text: "unreachable" }) });
-    const full = await crawl({ seeds: [{ address: "10.0.0.1", platform: "ios" }], maxDevices: 10, maxDepth: 5 }, transportFor);
+    const full = await crawl({ seeds: [{ address: "10.0.0.1", platform: "ios" }], maxDevices: 10, maxDepth: 5, allow: ["10.0.0.0/16"] }, transportFor);
     expect(full.devices.map((d) => [d.name, d.inspected])).toEqual([["A", true], ["B", true], ["C", true], ["phone", false]]);
     expect(full.links).toHaveLength(3); // A-B, B-C, B-phone: each cable once, not once per end
-    const shallow = await crawl({ seeds: [{ address: "10.0.0.1", platform: "ios" }], maxDevices: 10, maxDepth: 1 }, transportFor);
+    const shallow = await crawl({ seeds: [{ address: "10.0.0.1", platform: "ios" }], maxDevices: 10, maxDepth: 1, allow: ["10.0.0.0/16"] }, transportFor);
     expect(shallow.devices.find((d) => d.name === "C")?.inspected).toBe(false); // seen, not followed past the depth cap
-    const capped = await crawl({ seeds: [{ address: "10.0.0.1", platform: "ios" }], maxDevices: 2, maxDepth: 5 }, transportFor);
+    const capped = await crawl({ seeds: [{ address: "10.0.0.1", platform: "ios" }], maxDevices: 2, maxDepth: 5, allow: ["10.0.0.0/16"] }, transportFor);
     expect(capped.warnings.join()).toMatch(/Stopped at 2 devices/);
   });
 });

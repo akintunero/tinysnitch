@@ -3,6 +3,7 @@ import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { type NodeKind } from "../cml/node-types";
 import { PLATFORMS, type Environment, type Platform } from "../core/types";
+import { inRanges, parseRange, type Range } from "../core/cidr";
 import { isSecretRef } from "../core/secrets";
 
 /**
@@ -53,16 +54,25 @@ const site = z.strictObject({
   links: z.array(link).default([]),
 });
 
-/** A crawl: start at the seeds and follow CDP/LLDP neighbours, never further than the caps. Uses the seeds' credential. */
+const allowEntry = z.string().superRefine((v, ctx) => { const r = parseRange(v); if (typeof r === "string") ctx.addIssue({ code: "custom", message: r }); });
+
+/**
+ * A crawl: start at the seeds and follow CDP/LLDP neighbours, never further than the caps and never outside `allow`.
+ * Uses the seeds' credential, which is why `allow` is required: a crawl must not try that credential on devices that are not yours.
+ */
 const discovery = z.strictObject({
   id: z.string().regex(/^[A-Za-z0-9._-]+$/, "use letters, digits, dot, dash or underscore"),
   title: z.string().min(1),
   environment,
   credential: z.string(),
   seeds: z.array(z.strictObject({ address: z.string().min(1), platform, port: z.number().int().min(1).max(65535).optional(), jump: z.string().optional() })).min(1),
+  allow: z.array(allowEntry).min(1, "list the address ranges the crawl may log in to, for example 10.0.0.0/16"),
   maxDevices: z.number().int().min(1).max(200).default(30),
   maxDepth: z.number().int().min(0).max(8).default(3),
 });
+
+/** The parsed ranges of a discovery definition's allow-list (already validated when the inventory was loaded). */
+export const allowRanges = (allow: string[]): Range[] => allow.map(parseRange).filter((r): r is Range => typeof r !== "string");
 
 export const inventorySchema = z.strictObject({
   credentials: z.record(z.string(), credential).default({}),
@@ -134,6 +144,8 @@ export function validateInventory(raw: unknown): Inventory {
     if (seen.has(`discovery:${d.id}`)) throw new InventoryError(`Discovery id "${d.id}" appears twice.`);
     seen.add(`discovery:${d.id}`);
     if (!inv.credentials[d.credential]) throw new InventoryError(`Discovery "${d.id}" uses credential "${d.credential}", which is not defined.`);
+    const ranges = allowRanges(d.allow);
+    for (const s of d.seeds) if (!inRanges(s.address, ranges)) throw new InventoryError(`Discovery "${d.id}": the seed ${s.address} is not inside its allow list (${d.allow.join(", ")}).`);
     for (const s of d.seeds) if (s.jump && !inv.jumpHosts[s.jump]) throw new InventoryError(`Discovery "${d.id}" uses jump host "${s.jump}", which is not defined.`);
   }
   for (const [name, j] of Object.entries(inv.jumpHosts)) {

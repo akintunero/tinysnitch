@@ -9,6 +9,9 @@ read-back verification and rollback. It works with Cisco Modeling Labs and with 
 The Anthropic API key, the MCP credentials and device credentials stay on the server. They are never sent to the
 browser, and they are masked in logs, in the activity feed and before any device output reaches Claude.
 
+**New here? Start with the [usage guide](docs/USAGE.md):** connecting networks and real devices, SSH keys, discovery, everyday
+workflows, settings, securing a deployment and troubleshooting. This README is the reference for how each part works.
+
 ## What it does
 
 | Page | What it is for |
@@ -31,7 +34,7 @@ a network is a lab or real hardware.
   - **Inventory file** (`TS_INVENTORY_FILE`): sites, devices, optional links, credential references. See `inventory.example.yaml`.
   - **Ansible inventory** (`TS_ANSIBLE_INVENTORY`): YAML, JSON or INI. Each top-level group becomes a network; see below.
   - **NetBox**: sites, devices (primary IP, platform, role) and cables.
-  - **Discovery**: a bounded crawl of CDP/LLDP neighbour tables from seed devices. Real links are derived from neighbour tables.
+  - **Discovery**: a bounded crawl of CDP/LLDP neighbour tables from seed devices, confined to a required `allow` list of address ranges so its one credential is never tried on devices outside them (a neighbour outside is recorded as seen and not logged in to). Real links are derived from neighbour tables.
 - **Device transport** talks to devices: `run` for one `show`, `ping` or `traceroute` command, `push` for configuration, `save` to write startup.
   - **SSH** (`ssh2`): per-device credentials, optional jump host, host key pinning or first-use memory with refusal if it later changes.
   - **NETCONF** over SSH (Junos): reads through the `<command>` RPC; changes are loaded into the candidate configuration, checked, and

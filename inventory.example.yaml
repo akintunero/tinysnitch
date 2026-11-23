@@ -40,7 +40,7 @@ sites:
     links:                             # optional; or run discovery to find them from CDP/LLDP
       - { a: lon-core1, aInterface: GigabitEthernet0/1, b: lon-sw1, bInterface: GigabitEthernet0/0 }
 
-# Find a network by crawling CDP/LLDP neighbour tables from a seed. Read-only, capped.
+# Find a network by crawling CDP/LLDP neighbour tables from a seed. Read-only, capped, and confined to `allow`.
 discovery:
   - id: branch-crawl
     title: Branch network (discovered)
@@ -48,5 +48,8 @@ discovery:
     credential: netops
     seeds:
       - { address: 10.20.0.1, platform: ios }
+    # Required. The crawl logs in only to addresses inside these ranges, so the credential is never tried on an
+    # ISP edge or a partner's router. A neighbour outside is recorded as "seen" and left alone. Seeds must be inside.
+    allow: [10.20.0.0/16]
     maxDevices: 30
     maxDepth: 3

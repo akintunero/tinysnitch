@@ -6,7 +6,8 @@ import { hostKeyStore } from "../database/repo";
 import { normIf } from "../diagnostics/parsers";
 import { getContext } from "../server/context";
 import { SshTransport, type SshTarget } from "../transport/ssh";
-import { type DiscoveryDef, type Inventory } from "./inventory-file";
+import { inRanges } from "../core/cidr";
+import { allowRanges, type DiscoveryDef, type Inventory } from "./inventory-file";
 import { circleLayout, targetFor } from "./static";
 
 export type Neighbor = { name: string; address: string | null; localIf: string; remoteIf: string; platformText: string; capabilities: string; protocol: "cdp" | "lldp" };
@@ -71,10 +72,12 @@ export type CrawlTransport = { run(d: DeviceRef, c: string): Promise<{ ok: boole
 
 /**
  * Breadth-first crawl over neighbour tables. Bounded by depth and device count, and it follows only devices that
- * advertise themselves as a router or switch and have a management address. Read-only: it runs `show` commands only.
+ * advertise themselves as a router or switch, have a management address and sit inside the allow-list. A neighbour outside
+ * the allow-list is recorded as seen and never logged in to, so the crawl's credential is not tried on it. Read-only: it
+ * runs `show` commands only.
  */
 export async function crawl(
-  def: Pick<DiscoveryDef, "seeds" | "maxDevices" | "maxDepth">,
+  def: Pick<DiscoveryDef, "seeds" | "maxDevices" | "maxDepth" | "allow">,
   transportFor: (address: string, platform: Platform, seedIndex: number) => CrawlTransport,
 ): Promise<DiscoveryResult> {
   const devices = new Map<string, DiscoveredDevice>();
@@ -83,10 +86,13 @@ export async function crawl(
   const byAddress = new Map<string, string>();
   type Item = { address: string; platform: Platform; depth: number; seed: number; hint: string | null };
   const queue: Item[] = def.seeds.map((s, i) => ({ address: s.address, platform: s.platform, depth: 0, seed: i, hint: null }));
+  const ranges = allowRanges(def.allow);
+  const outside = new Set<string>();
 
   while (queue.length) {
     const it = queue.shift()!;
     if (byAddress.has(it.address)) continue;
+    if (!inRanges(it.address, ranges)) continue; // the seeds are checked when the inventory loads; a queued neighbour is checked before it is queued
     if (devices.size >= def.maxDevices) { warnings.push(`Stopped at ${def.maxDevices} devices; more may exist.`); break; }
     const t = transportFor(it.address, it.platform, it.seed);
     const ref: DeviceRef = { id: it.address, label: it.address, kind: "router", platform: it.platform };
@@ -114,16 +120,19 @@ export async function crawl(
       if (!links.has(key)) links.set(key, { a: name, aInterface: n.localIf, b: n.name, bInterface: n.remoteIf, via: n.protocol });
       const known = devices.get(n.name);
       const plat = guessPlatform(n.platformText, it.platform);
-      if (!known) devices.set(n.name, { name: n.name, address: n.address, platform: plat, kind: kindOf(n.capabilities), inspected: false, depth: it.depth + 1, note: "Seen as a neighbour; not logged in to." });
+      const allowed = inRanges(n.address, ranges);
+      if (n.address && !allowed && FOLLOW.test(n.capabilities)) outside.add(`${n.name} (${n.address})`);
+      if (!known) devices.set(n.name, { name: n.name, address: n.address, platform: plat, kind: kindOf(n.capabilities), inspected: false, depth: it.depth + 1, note: allowed || !n.address ? "Seen as a neighbour; not logged in to." : "Seen as a neighbour outside the allow-list; not logged in to." });
       else {
         if (!known.address && n.address) known.address = n.address;
         if (known.kind === "other" && n.capabilities) known.kind = kindOf(n.capabilities); // what the neighbour says it is
       }
-      if (!known?.inspected && n.address && FOLLOW.test(n.capabilities) && it.depth < def.maxDepth && !byAddress.has(n.address)) {
+      if (!known?.inspected && n.address && allowed && FOLLOW.test(n.capabilities) && it.depth < def.maxDepth && !byAddress.has(n.address)) {
         queue.push({ address: n.address, platform: plat, depth: it.depth + 1, seed: it.seed, hint: n.name });
       }
     }
   }
+  if (outside.size) warnings.push(`Not followed, because they are outside the allow-list: ${[...outside].join(", ")}.`);
   // A device we logged in to but nobody described is treated as a router; its kind only decides which checks apply.
   for (const d of devices.values()) if (d.inspected && d.kind === "other") d.kind = "router";
   return { at: new Date().toISOString(), devices: [...devices.values()], links: [...links.values()], warnings };
