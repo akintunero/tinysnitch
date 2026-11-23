@@ -72,7 +72,7 @@ export function BackupsView() {
     <div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-line pb-3">
         <div>
-          <h1 className="text-[17px] font-semibold tracking-tight">Backups and drift</h1>
+          <h1 className="text-[20px] font-semibold leading-7 tracking-tight">Backups and drift</h1>
           <p className="text-soft text-[12px]">{scope?.title ?? "Selected network"} · {scope?.environment ?? "lab"} · reads configurations only; nothing is changed on any device</p>
         </div>
         <Button variant="primary" onClick={() => void runNow()} disabled={busy !== null || !can("operator")}>{busy === "run" ? "Reading devices" : "Back up now"}</Button>
@@ -127,7 +127,7 @@ export function BackupsView() {
           </ul>
           <section aria-label="Version">
             {open ? (
-              <div className="rounded-md border border-ink bg-surface p-3">
+              <div className="rounded-md border border-accent/60 bg-surface p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h2 className="text-[14px] font-semibold">{open.backup.device}</h2>

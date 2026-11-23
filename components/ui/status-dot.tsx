@@ -15,20 +15,21 @@ export function StatusDot({ tone, label, className }: { tone: Tone; label: strin
   );
 }
 
+/** What to show when there is nothing yet: say what is missing, and offer the one thing that fixes it. */
 export function EmptyState({ title, children, action }: { title: string; children?: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="rounded-md border border-dashed border-line px-6 py-10 text-center">
-      <p className="font-medium">{title}</p>
-      {children ? <p className="text-soft mx-auto mt-1 max-w-md text-[13px]">{children}</p> : null}
-      {action ? <div className="mt-4">{action}</div> : null}
+    <div className="border-l-2 border-line py-1 pl-4">
+      <p className="text-[14px] font-medium">{title}</p>
+      {children ? <p className="text-soft mt-1 max-w-prose text-[13px]">{children}</p> : null}
+      {action ? <div className="mt-3">{action}</div> : null}
     </div>
   );
 }
 
 export function PageHeader({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
-    <div className="mb-5 flex items-end justify-between gap-4 border-b border-line pb-3">
-      <h1 className="text-[17px] font-semibold tracking-tight">{title}</h1>
+    <div className="mb-7 flex items-end justify-between gap-4 border-b border-line pb-4">
+      <h1 className="text-[20px] font-semibold leading-7 tracking-tight">{title}</h1>
       <div className="flex items-center gap-2">{children}</div>
     </div>
   );

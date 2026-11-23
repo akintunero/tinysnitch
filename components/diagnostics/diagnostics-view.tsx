@@ -103,7 +103,7 @@ export function DiagnosticsView({ labId, labTitle }: { labId: string; labTitle: 
     <div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-line pb-3">
         <div>
-          <h1 className="text-[17px] font-semibold tracking-tight">Diagnostics</h1>
+          <h1 className="text-[20px] font-semibold leading-7 tracking-tight">Diagnostics</h1>
           <p className="text-soft text-[12px]">{labTitle ?? "Selected lab"} · read-only checks on running routers and switches</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -199,7 +199,7 @@ function FindingDetail({ f, affected }: { f: StoredFinding; affected: FindingImp
     <div className="mt-3"><h3 className="text-soft mb-0.5 text-[11px] font-semibold uppercase tracking-wide">{label}</h3><div className="text-[13px]">{children}</div></div>
   );
   return (
-    <div className="rounded-md border border-ink bg-surface p-4">
+    <div className="rounded-md border border-accent/60 bg-surface p-4">
       <div className="flex items-baseline gap-2 text-[11px] font-semibold uppercase tracking-wide">
         <span className={SEV_TEXT[f.severity]}>{f.severity}</span><span>{f.status}</span>
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
-import { BrickWall, Box, Cable, Layers, Monitor, Network, Router, Server, Terminal } from "lucide-react";
+import { BrickWall, Box, Cable, Monitor, Server, Terminal } from "lucide-react";
 import type { ComponentType } from "react";
 import { StatusDot, type Tone } from "@/components/ui/status-dot";
 import type { NodeKind } from "@/lib/cml/node-types";
@@ -15,14 +15,36 @@ export type DeviceData = {
   interfaceCount: number;
   dimmed: boolean;
   selected: boolean;
-  /** Set by diagnostics (Phase 5). Nothing sets it yet, so nothing is flagged until there is evidence. */
+  /** Set from the latest diagnostics run. Nothing is flagged without evidence. */
   fault?: "warning" | "error";
   [key: string]: unknown;
 };
 export type DeviceNode = Node<DeviceData, "device">;
 
-const ICON: Record<NodeKind, ComponentType<{ className?: string; strokeWidth?: number }>> = {
-  router: Router, l2switch: Network, l3switch: Layers, firewall: BrickWall, server: Server, host: Terminal, pc: Monitor, connector: Cable, other: Box,
+type GlyphProps = { className?: string; strokeWidth?: number };
+
+/** The conventional diagram symbols: a router is a circle with arrows in and out; a switch is a box with arrows across it. */
+const Arrows = () => (
+  <path d="M12 7V3m0 0-1.5 1.5M12 3l1.5 1.5M12 17v4m0 0-1.5-1.5M12 21l1.5-1.5M7 12H3m0 0 1.5-1.5M3 12l1.5 1.5M17 12h4m0 0-1.5-1.5M21 12l-1.5 1.5" />
+);
+const RouterGlyph = ({ className, strokeWidth = 1.75 }: GlyphProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+    <circle cx="12" cy="12" r="5" /><Arrows />
+  </svg>
+);
+const SwitchGlyph = ({ className, strokeWidth = 1.75 }: GlyphProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+    <rect x="3" y="7" width="18" height="10" rx="1.5" /><path d="M7 10.5h10m-2.5-2 2.5 2-2.5 2M17 13.5H7m2.5-2-2.5 2 2.5 2" />
+  </svg>
+);
+const L3SwitchGlyph = ({ className, strokeWidth = 1.75 }: GlyphProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+    <rect x="3" y="7" width="18" height="10" rx="1.5" /><circle cx="12" cy="12" r="2.5" />
+  </svg>
+);
+
+const ICON: Record<NodeKind, ComponentType<GlyphProps>> = {
+  router: RouterGlyph, l2switch: SwitchGlyph, l3switch: L3SwitchGlyph, firewall: BrickWall, server: Server, host: Terminal, pc: Monitor, connector: Cable, other: Box,
 };
 
 export function nodeStateView(state: string): { tone: Tone; label: string } {

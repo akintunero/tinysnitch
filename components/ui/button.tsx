@@ -7,11 +7,12 @@ const button = cva(
   {
     variants: {
       variant: {
-        primary: "border-ink bg-ink text-bg hover:bg-[#3a3d40]",
-        secondary: "border-line bg-surface text-ink hover:bg-surface-2",
-        ghost: "border-transparent text-ink hover:bg-surface-2",
+        // The one action a page wants: the accent colour, never the plain ink, so it reads as a choice and not as a heading.
+        primary: "border-accent bg-accent text-on-accent shadow-[inset_0_-1px_0_rgb(0_0_0/0.18)] hover:brightness-110",
+        secondary: "border-line bg-surface text-ink hover:border-muted hover:bg-surface-2",
+        ghost: "border-transparent text-soft hover:bg-surface-2 hover:text-ink",
       },
-      size: { sm: "h-7 px-2.5", md: "h-8 px-3" },
+      size: { sm: "h-7 px-2.5", md: "h-8 px-3.5" },
     },
     defaultVariants: { variant: "secondary", size: "md" },
   },

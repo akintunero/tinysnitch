@@ -103,7 +103,7 @@ export function ChangesView() {
     <div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-line pb-3">
         <div>
-          <h1 className="text-[17px] font-semibold tracking-tight">Configurations</h1>
+          <h1 className="text-[20px] font-semibold leading-7 tracking-tight">Configurations</h1>
           <p className="text-soft text-[12px]">{scope?.title ?? "Selected network"} · {scope?.environment ?? "lab"} · mode: {mode === "approve" ? "Approve and deploy" : mode === "suggest" ? "Suggest" : "Autopilot"}</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -210,7 +210,7 @@ function Detail({ c, mode, busy, act, networkTitle, onDeleted }: { c: Change; mo
   const b = (a: string) => busy === `${c.id}:${a}`;
 
   return (
-    <div className="rounded-md border border-ink bg-surface p-4">
+    <div className="rounded-md border border-accent/60 bg-surface p-4">
       <Badge className={STATUS[c.status].tone}>{STATUS[c.status].label}{working ? " ..." : ""}</Badge>
       <h2 className="text-[15px] font-semibold">{c.title}</h2>
       <p className="text-soft text-[12px]">{SOURCE[c.source]} · {c.environment} · {lines} line(s) on {c.plan.devices.length} device(s) · {relativeTime(c.createdAt)}{c.approvedAt ? ` · approved by ${c.approvedBy} ${relativeTime(c.approvedAt)}` : ""}</p>

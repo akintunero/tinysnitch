@@ -1,6 +1,7 @@
 @import "tailwindcss";
+@source not "../tests";
 
-/* Off-white, grey, charcoal. Colour is reserved for state. */
+/* Off-white, grey, charcoal, one slate-teal accent. Colour is reserved for state. */
 @theme {
   --color-bg: #F3F2EE;
   --color-surface: #FAF9F6;
@@ -8,22 +9,80 @@
   --color-ink: #292B2D;
   --color-muted: #858783;
   --color-line: #D8D7D1;
+  --color-accent: #2D5B6B;
+  --color-on-accent: #FFFFFF;
+  --color-code: #25282A;
+  --color-code-ink: #E7E6E0;
   --color-ok: #39845A;
   --color-warn: #B77936;
   --color-bad: #B94B45;
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Consolas, monospace;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
 
   --radius-sm: 3px;
   --radius-md: 5px;
 }
 
-html { background: var(--color-bg); }
-body { background: var(--color-bg); color: var(--color-ink); font-family: var(--font-sans); font-size: 14px; line-height: 1.5; }
-:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; }
-::selection { background: var(--color-surface-2); }
+/* Dark: the same roles on a warm near-black, never pure black. It follows the system unless a theme is chosen in the header. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-bg: #141615;
+    --color-surface: #1B1E1D;
+    --color-surface-2: #262A28;
+    --color-ink: #E3E5E1;
+    --color-muted: #7F8581;
+    --color-line: #2E3331;
+    --color-accent: #78AEBD;
+    --color-on-accent: #0E1719;
+    --color-code: #0F1110;
+    --color-code-ink: #D9DBD7;
+    --color-ok: #5DB682;
+    --color-warn: #D79B50;
+    --color-bad: #E3766F;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #141615;
+  --color-surface: #1B1E1D;
+  --color-surface-2: #262A28;
+  --color-ink: #E3E5E1;
+  --color-muted: #7F8581;
+  --color-line: #2E3331;
+  --color-accent: #78AEBD;
+  --color-on-accent: #0E1719;
+  --color-code: #0F1110;
+  --color-code-ink: #D9DBD7;
+  --color-ok: #5DB682;
+  --color-warn: #D79B50;
+  --color-bad: #E3766F;
+}
+:root[data-theme="light"] { color-scheme: light; }
 
-/* Secondary text that must stay readable. The specified grey (#858783) is reserved for icons,
-   timestamps and placeholders, where it does not carry meaning on its own. */
+html { background: var(--color-bg); }
+body { background: var(--color-bg); color: var(--color-ink); font-family: var(--font-sans); font-size: 14px; line-height: 1.5; font-feature-settings: "tnum" 0; -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--color-accent) 28%, transparent); }
+
+/* Small caps-style heading for groups and sections: quiet, so the data stays the loudest thing on the page. */
+.label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-muted); }
+a.underline, .link { text-decoration-color: color-mix(in srgb, var(--color-accent) 50%, transparent); text-underline-offset: 3px; }
+a.underline:hover { color: var(--color-accent); }
+/* Secondary text that must stay readable. The specified grey is reserved for icons, timestamps and placeholders,
+   where it does not carry meaning on its own. */
 .text-soft { color: color-mix(in srgb, var(--color-ink) 68%, var(--color-bg)); }
+
+/* The topology canvas ships with white controls. Point its variables at the theme so they follow light and dark. */
+.react-flow {
+  --xy-controls-button-background-color: var(--color-surface);
+  --xy-controls-button-background-color-hover: var(--color-surface-2);
+  --xy-controls-button-color: var(--color-ink);
+  --xy-controls-button-color-hover: var(--color-ink);
+  --xy-controls-button-border-color: var(--color-line);
+  --xy-controls-box-shadow: 0 0 0 1px var(--color-line);
+  --xy-edge-label-background-color: var(--color-surface);
+  --xy-edge-label-color: var(--color-ink);
+  --xy-background-color: transparent;
+}

@@ -1,6 +1,8 @@
 # docker compose up --build
-# Open http://localhost:3000. The port is published to this machine's loopback only: Tiny Snitch has no login,
-# so do not change "127.0.0.1" to "0.0.0.0" or put it behind a public proxy.
+# Open http://localhost:3000. The port is published to this machine's loopback only. Inside the container the app
+# listens beyond loopback, so it starts closed: the first visit asks for a setup token (TS_SETUP_TOKEN, or the one
+# printed in `docker compose logs`) and creates the first administrator. To reach it from other machines, publish
+# the port on another interface only behind TLS (a reverse proxy), and use API tokens for other systems.
 #
 # Configuration comes from .env.local (same file as running it natively), plus optional mounts below.
 # In .env.local, write ${VAR} references as {{VAR}} (see .env.example); that works here too.

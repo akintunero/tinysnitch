@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { useApp } from "@/components/layout/status-provider";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/status-dot";
 import { apiSend } from "@/lib/client";
 import { cn } from "@/lib/utils";
 
 const STATE_TONE: Record<string, string> = { STARTED: "text-ok", BOOTED: "text-ok", DISCOVERED: "text-ok", INVENTORY: "text-ok", STOPPED: "text-soft", DEFINED_ON_CORE: "text-soft", NOT_RUN: "text-soft" };
-const SOURCE: Record<string, string> = { cml: "CML", static: "Inventory file", netbox: "NetBox", discovery: "Discovery" };
+const SOURCE: Record<string, string> = { cml: "CML", static: "Inventory file", netbox: "NetBox", discovery: "Discovery", ansible: "Ansible" };
 
 export function LabsTable() {
   const { status, settings, labs, refreshLabs, selectLab } = useApp();
@@ -71,10 +72,10 @@ export function LabsTable() {
                   {/* w-full + max-w-0 lets the title column shrink and truncate instead of forcing a scrollbar */}
                   <td className="w-full max-w-0 px-3 py-2"><div className="truncate font-medium">{l.title}</div>{l.description ? <div className="text-soft truncate text-[12px]">{l.description}</div> : null}</td>
                   <td className="text-soft whitespace-nowrap px-3 py-2 text-[12px]">{SOURCE[l.providerKind ?? "cml"]}</td>
-                  <td className={cn("whitespace-nowrap px-3 py-2 text-[12px]", l.environment === "production" ? "font-semibold text-warn" : "text-soft")}>{l.environment ?? "lab"}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-[12px]">{l.environment === "production" ? <Badge className="text-warn">production</Badge> : <span className="text-soft">{l.environment ?? "lab"}</span>}</td>
                   <td className={cn("whitespace-nowrap px-3 py-2 font-mono text-[11px]", STATE_TONE[l.state] ?? "text-soft")}>{l.state}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{l.nodeCount ?? "-"}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{l.linkCount ?? "-"}</td>
+                  <td className="px-3 py-2 text-right font-mono text-[12px] tabular-nums">{l.nodeCount ?? "-"}</td>
+                  <td className="px-3 py-2 text-right font-mono text-[12px] tabular-nums">{l.linkCount ?? "-"}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-right">
                     {l.providerKind === "discovery" ? <Button size="sm" className="mr-2" disabled={busy !== null} onClick={() => void discover(l.id)}>{busy === l.id ? "Discovering" : l.state === "NOT_RUN" ? "Run discovery" : "Run again"}</Button> : null}
                     {selected ? <span className="text-[12px] font-medium">Selected</span> : <Button size="sm" disabled={busy !== null || l.state === "NOT_RUN"} onClick={() => void choose(l.id)}>Select</Button>}

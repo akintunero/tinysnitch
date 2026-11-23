@@ -146,7 +146,7 @@ export function ServicesView() {
 
           <section aria-label="Service details">
             {!detail ? <p className="text-soft text-[13px]">Select a service to see what it is, where it is and its history.</p> : (
-              <div className="rounded-md border border-ink bg-surface p-4">
+              <div className="rounded-md border border-accent/60 bg-surface p-4">
                 <div className="flex flex-wrap items-center gap-2"><Badge className={TONE[detail.status]}>{detail.status}</Badge><h2 className="text-[15px] font-semibold">{detail.name}</h2></div>
                 <p className="text-soft text-[12px]">{detail.title} · provisioned {relativeTime(detail.createdAt)}{detail.createdBy ? ` by ${detail.createdBy}` : ""}</p>
                 <p className="mt-2 text-[13px]">{EXPLAIN[detail.status]}{detail.pending ? <> <Link className="underline" href={`/configurations?change=${detail.pending.changeId}`}>Open the change</Link></> : null}</p>

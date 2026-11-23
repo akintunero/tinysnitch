@@ -233,7 +233,7 @@ describe("Ansible playbook export", () => {
 });
 
 describe("Docker and the app runner", () => {
-  it("listens on APP_HOST (with a warning when it is not loopback) and defaults to loopback", () => {
+  it("listens on APP_HOST (with a note when it is not loopback) and defaults to loopback", () => {
     const run = (env: Record<string, string>) => {
       const e: Record<string, string | undefined> = { ...process.env, RUN_NEXT_DRY: "1", ...env };
       if (!("APP_HOST" in env)) delete e.APP_HOST;
@@ -241,10 +241,10 @@ describe("Docker and the app runner", () => {
     };
     const open = run({ APP_HOST: "0.0.0.0", APP_PORT: "3010" });
     expect(JSON.parse(open.stdout)).toMatchObject({ host: "0.0.0.0", port: "3010" });
-    expect(open.stderr).toMatch(/no login/);
+    expect(open.stderr).toMatch(/stays closed until the first administrator/);
     const dflt = run({});
     expect(JSON.parse(dflt.stdout).host).toBe("127.0.0.1");
-    expect(dflt.stderr).not.toMatch(/no login/);
+    expect(dflt.stderr).not.toMatch(/stays closed/);
   });
 
   const compose = parseYaml(readFileSync(join(ROOT, "compose.yaml"), "utf8")) as { services: Record<string, { ports: string[]; environment: Record<string, string>; cap_drop?: string[]; privileged?: boolean; network_mode?: string; security_opt?: string[] }> };

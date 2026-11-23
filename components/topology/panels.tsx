@@ -99,7 +99,7 @@ export function DevicePanel({ node, topology, findings, onSelectNode, onSelectLi
       <Findings findings={findings} />
       <p className="text-soft mt-1 text-[11px]">Routing tables and adjacencies are read from running devices by the <Link className="underline" href="/diagnostics">diagnostics run</Link>.</p>
       <H>Operations</H>
-      <p className="text-soft text-[12px]">Configuration operations arrive in Phase 6 and will always ask for approval.</p>
+      <p className="text-soft text-[12px]">To change this device, file a change on the Configurations page; nothing is applied without approval.</p>
     </Shell>
   );
 }

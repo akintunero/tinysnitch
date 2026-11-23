@@ -13,10 +13,10 @@ const host = (process.env.APP_HOST || "127.0.0.1").trim();
 const bin = new URL("../node_modules/next/dist/bin/next", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const args = [decodeURIComponent(bin), mode, "-H", host, "-p", port];
 
-// The app has no login. Listening beyond loopback is meant for a container whose port is published to the host's
-// loopback only; anywhere else it would put an unauthenticated network tool on the network.
+// Listening beyond loopback is meant for a container whose port is published to the host's loopback, or for a server
+// behind TLS. The app then starts closed: it needs a first administrator before it answers anything.
 if (!/^(127\.\d+\.\d+\.\d+|localhost|::1)$/i.test(host)) {
-  console.error(`Warning: listening on ${host}. Tiny Snitch has no login; publish the port to 127.0.0.1 only and keep it off untrusted networks.`);
+  console.error(`Note: listening on ${host}. The app stays closed until the first administrator is created (setup token below); put TLS in front of it before exposing it beyond a trusted network.`);
 }
 
 // Lets a test check the arguments without starting a server.

@@ -189,7 +189,7 @@ function Canvas({ labId }: { labId: string }) {
     <div className="flex h-full min-h-0 flex-col">
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="min-w-0">
-          <h1 className="truncate text-[17px] font-semibold tracking-tight">{topology.lab.title}</h1>
+          <h1 className="truncate text-[20px] font-semibold leading-7 tracking-tight">{topology.lab.title}</h1>
           <p className="text-soft text-[12px]">
             {topology.nodes.length} nodes, {topology.links.length} links · lab {topology.lab.state.toLowerCase().replace(/_/g, " ")} · read {new Date(topology.fetchedAt).toLocaleTimeString()}
             {diag?.run ? ` · link states from the diagnostics run ${relativeTime(diag.run.finishedAt)}` : <> · links not inspected yet, <Link className="underline" href="/diagnostics">run diagnostics</Link></>}
@@ -223,7 +223,7 @@ function Canvas({ labId }: { labId: string }) {
             onNodesChange={onNodesChange} onNodeDragStop={onNodeDragStop} onNodeClick={onNodeClick} onEdgeClick={onEdgeClick} onPaneClick={() => setSelection(null)}
             nodesConnectable={false} elementsSelectable minZoom={0.15} maxZoom={2.5} proOptions={{ hideAttribution: true }} colorMode="light"
           >
-            <Background gap={24} size={1} color="#D8D7D1" />
+            <Background gap={24} size={1} color="var(--color-line)" />
             <Controls showInteractive={false} position="bottom-left" />
           </ReactFlow>
         </div>

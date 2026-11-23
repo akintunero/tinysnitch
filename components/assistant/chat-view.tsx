@@ -185,7 +185,7 @@ export function ChatView() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line pb-3">
-        <h1 className="text-[17px] font-semibold tracking-tight">Network Assistant</h1>
+        <h1 className="text-[20px] font-semibold leading-7 tracking-tight">Network Assistant</h1>
         <span className="text-soft text-[12px]">{labTitle ? `Network: ${labTitle}` : "No network selected"}</span>
         <div className="ml-auto flex items-center gap-2">
           <label className="flex items-center gap-2 text-[12px]">

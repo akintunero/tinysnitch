@@ -39,7 +39,8 @@ USER node
 VOLUME ["/app/data"]
 EXPOSE 3000
 
+# Any answer below 500 means the server is up. Before the first administrator exists /api/status answers 401, which is healthy.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.APP_PORT||3000)+'/api/status').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.APP_PORT||3000)+'/api/status').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "scripts/run-next.mjs", "start"]
