@@ -169,6 +169,30 @@ export class NetconfTransport implements DeviceTransport {
     }
   }
 
+  /** Loads the lines into the candidate, runs `commit check`, and throws the candidate away. Nothing is committed. */
+  async dryRun(device: DeviceRef, commands: string[]): Promise<CommandOutcome | null> {
+    if (device.platform !== "junos") return null;
+    const bad = blockedLines(commands, "junos");
+    if (bad.length) return { ok: false, text: `Not checked: "${bad[0].line.slice(0, 60)}" ${bad[0].reason}.` };
+    let s: NetconfSession;
+    try { s = await this.session(device); } catch (e) { return this.fail(e); }
+    let locked = false;
+    try {
+      const lock = rpcError(await s.rpc("<lock><target><candidate/></target></lock>"));
+      if (lock) return { ok: false, text: redactSecrets(`Could not lock the candidate configuration to check it: ${lock}`) };
+      locked = true;
+      const load = rpcError(await s.rpc(`<load-configuration action="set" format="text"><configuration-set>${xmlEscape(commands.join("\n"))}</configuration-set></load-configuration>`));
+      if (load) return { ok: false, text: redactSecrets(`The device would reject the change: ${load}`) };
+      const check = rpcError(await s.rpc("<commit-configuration><check/></commit-configuration>"));
+      return check ? { ok: false, text: redactSecrets(`The commit check would fail: ${check}`) } : { ok: true, text: "The device's commit check passes. Nothing was committed." };
+    } catch (e) {
+      return this.fail(e);
+    } finally {
+      await s.rpc("<discard-changes/>").catch(() => undefined);
+      if (locked) await s.rpc("<unlock><target><candidate/></target></unlock>").catch(() => undefined);
+    }
+  }
+
   async confirm(device: DeviceRef): Promise<CommandOutcome> {
     try {
       const err = rpcError(await (await this.session(device)).rpc("<commit-configuration/>"));

@@ -33,6 +33,11 @@ export class CompositeTransport implements DeviceTransport {
     return t?.confirm ? t.confirm(d) : { ok: true, text: "Nothing to confirm." };
   }
 
+  async dryRun(d: DeviceRef, commands: string[]): Promise<CommandOutcome | null> {
+    const t = this.of(d);
+    return t?.dryRun ? t.dryRun(d, commands) : null;
+  }
+
   async save(d: DeviceRef): Promise<CommandOutcome> {
     return this.of(d)?.save(d) ?? { ok: false, text: `${d.label}: no way to reach this device is configured.` };
   }
