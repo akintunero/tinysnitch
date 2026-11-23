@@ -5,10 +5,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Markdown } from "@/components/assistant/markdown";
 import { useApp } from "@/components/layout/status-provider";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { EmptyState } from "@/components/ui/status-dot";
 import { ClientError, apiGet, apiSend } from "@/lib/client";
 import type { HistoryPoint } from "@/lib/diagnostics/store";
+import type { FixChange } from "@/lib/diagnostics/fix";
 import type { FindingImpact } from "@/lib/provisioning/impact";
 import { Trend } from "./trend";
 import type { DerivedLink, NodeFault } from "@/lib/diagnostics/state";
@@ -17,6 +19,8 @@ import { cn, relativeTime } from "@/lib/utils";
 
 export type DiagnosticsData = {
   run: StoredRun | null; findings: StoredFinding[]; links: Record<string, DerivedLink>; nodeFaults: Record<string, NodeFault>; topologyError: string | null;
+  /** Changes filed to fix each finding, newest first. */
+  fixChanges?: Record<string, FixChange[]>;
 };
 
 const SEV_TEXT = { critical: "text-bad", warning: "text-warn", info: "text-soft" } as const;
@@ -176,7 +180,7 @@ export function DiagnosticsView({ labId, labTitle }: { labId: string; labTitle: 
             </section>
 
             <section aria-label="Finding details">
-              {open ? <FindingDetail f={open} affected={impact.find((i) => i.findingId === open.id)?.affected ?? []} /> : findings.length ? <p className="text-soft text-[13px]">Select a finding to see its evidence.</p> : null}
+              {open ? <FindingDetail f={open} affected={impact.find((i) => i.findingId === open.id)?.affected ?? []} fixes={data?.fixChanges?.[open.id] ?? []} onFiled={() => void load()} /> : findings.length ? <p className="text-soft text-[13px]">Select a finding to see its evidence.</p> : null}
             </section>
           </div>
 
@@ -194,7 +198,48 @@ export function DiagnosticsView({ labId, labTitle }: { labId: string; labTitle: 
   );
 }
 
-function FindingDetail({ f, affected }: { f: StoredFinding; affected: FindingImpact["affected"] }) {
+const FIX_TONE: Record<string, string> = { verified: "text-ok", failed: "text-bad", rollback_failed: "text-bad", rejected: "text-soft", rolled_back: "text-soft", removed: "text-soft" };
+
+/** The fix a finding states, as lines to read, with a way to file it as a change and a note of where each earlier attempt stands. */
+function FixBlock({ f, fixes, onFiled }: { f: StoredFinding; fixes: FixChange[]; onFiled: () => void }) {
+  const { can } = useApp();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fix = f.fix;
+  if (!fix) return null;
+  const openOne = fixes.find((c) => ["proposed", "approved", "deploying", "paused", "rolling_back"].includes(c.status));
+  const file = async () => {
+    setBusy(true); setError(null);
+    try { await apiSend("POST", `/api/findings/${f.id}/fix`, {}); onFiled(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  };
+  return (
+    <div className="mt-3 rounded-sm border border-line bg-surface-2 p-3">
+      <h3 className="text-soft mb-0.5 text-[11px] font-semibold uppercase tracking-wide">A fix Tiny Snitch can propose</h3>
+      <p className="text-[13px] font-medium">{fix.summary}</p>
+      {fix.note ? <p className="text-soft mt-0.5 text-[12px]">{fix.note}</p> : null}
+      <pre className="mt-2 overflow-x-auto rounded-sm bg-code p-2.5 font-mono text-[11.5px] leading-relaxed text-code-ink">{[f.device, ...fix.commands].join(String.fromCharCode(10))}</pre>
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        {openOne ? (
+          <span className="text-[13px]">A fix is open ({openOne.status.replace("_", " ")}). <Link className="underline" href={`/configurations?change=${openOne.changeId}`}>Review it</Link></span>
+        ) : (
+          <Button variant="primary" disabled={busy || !can("operator")} onClick={() => void file()}>{busy ? "Filing" : "Propose this fix"}</Button>
+        )}
+        <span className="text-soft text-[12px]">It becomes a change a person approves and applies; nothing is sent until then.</span>
+      </div>
+      {error ? <p role="alert" className="mt-1 text-[12px] text-bad">{error}</p> : null}
+      {fixes.filter((c) => c !== openOne).length ? (
+        <ul className="mt-2 space-y-0.5 text-[12px]">
+          {fixes.filter((c) => c !== openOne).map((c) => (
+            <li key={c.changeId} className="flex items-center gap-2"><Badge className={FIX_TONE[c.status] ?? "text-soft"}>{c.status.replace("_", " ")}</Badge>{c.title ? <Link className="underline" href={`/configurations?change=${c.changeId}`}>{c.title}</Link> : <span className="text-soft">removed</span>}<span className="text-soft">{relativeTime(c.createdAt)}</span></li>
+          ))}
+        </ul>
+      ) : null}
+      {fixes.some((c) => c.status === "verified") ? <p className="text-soft mt-1 text-[11px]">A fix was verified, yet this finding is still open. Run diagnostics again: if it persists, the fix did not address its cause.</p> : null}
+    </div>
+  );
+}
+
+function FindingDetail({ f, affected, fixes, onFiled }: { f: StoredFinding; affected: FindingImpact["affected"]; fixes: FixChange[]; onFiled: () => void }) {
   const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div className="mt-3"><h3 className="text-soft mb-0.5 text-[11px] font-semibold uppercase tracking-wide">{label}</h3><div className="text-[13px]">{children}</div></div>
   );
@@ -221,6 +266,7 @@ function FindingDetail({ f, affected }: { f: StoredFinding; affected: FindingImp
       ) : null}
       <Row label="Probable cause">{f.probableCause}</Row>
       <Row label="Recommended action">{f.recommendedAction}</Row>
+      <FixBlock f={f} fixes={fixes} onFiled={onFiled} />
       <Row label={f.status === "confirmed" ? "How it was confirmed" : "How to confirm it"}>{f.verification}</Row>
       <p className="text-soft mt-3 text-[11px]">First seen {relativeTime(f.firstSeen)}, last seen {relativeTime(f.lastSeen)}.</p>
       <div className="mt-3 flex flex-wrap gap-3 text-[13px]">

@@ -56,6 +56,7 @@ describe.skipIf(!ready)("the checks, run on the whole real lab", () => {
       expect.stringMatching(/^Hamburg# show ip bgp summary: BGP router identifier .*local AS number 65200$/),
     ]);
     expect(f!.recommendedAction).toContain('"neighbor 10.0.15.2 remote-as 65200" on London');
+    expect(f!.fix).toEqual({ summary: "Set neighbor 10.0.15.2 to remote-as 65200 on London", note: expect.stringContaining("If Hamburg is the one with the wrong AS"), commands: ["router bgp 65100", "neighbor 10.0.15.2 remote-as 65200"] });
   });
 
   it("raises it once, and does not blame the healthy sessions", () => {

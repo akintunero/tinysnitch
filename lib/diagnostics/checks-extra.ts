@@ -5,7 +5,7 @@
  */
 import type { TopoLink, TopoNode } from "../cml/topology";
 import { type DeviceCfg, type IfBriefRow, normIf, parseBgpSummary } from "./parsers";
-import type { Finding } from "./types";
+import type { Finding, Fix } from "./types";
 
 export type MakeFinding = (f: Omit<Finding, "id">) => Finding;
 
@@ -161,7 +161,17 @@ export function shadows(a: Ace, b: Ace): boolean {
 }
 
 // ---- baseline ------------------------------------------------------------------------------------------------
-type Hit = { kind: string; severity: Finding["severity"]; title: string; description: string; evidence: string[]; cause: string; action: string };
+type Hit = { kind: string; severity: Finding["severity"]; title: string; description: string; evidence: string[]; cause: string; action: string; fix?: Fix };
+
+/** Correct the remote AS on this router. It is one of two possible fixes (the other router's own AS could be the wrong one), so the note says so. */
+function bgpFix(platform: TopoNode["platform"], local: string | null, neighbor: string, remote: string, label: string, otherLabel: string): { fix?: Fix } {
+  if (!local || !/^\d+$/.test(local) || !/^\d+$/.test(remote)) return {};
+  const note = `This sets the AS on ${label}. If ${otherLabel} is the one with the wrong AS, change that instead.`;
+  const summary = `Set neighbor ${neighbor} to remote-as ${remote} on ${label}`;
+  if (platform === "nxos") return { fix: { summary, note, commands: [`router bgp ${local}`, `neighbor ${neighbor}`, `remote-as ${remote}`] } };
+  if (platform === "ios" || platform === "eos" || platform === undefined) return { fix: { summary, note, commands: [`router bgp ${local}`, `neighbor ${neighbor} remote-as ${remote}`] } };
+  return {};
+}
 
 /** A small security and hygiene baseline read from the configuration text. */
 export function baseline(config: string): Hit[] {
@@ -170,15 +180,15 @@ export function baseline(config: string): Hit[] {
   const hits: Hit[] = [];
   const absent = (what: string) => `(no ${what} line in the running configuration)`;
 
-  if (!has(/^ip ssh version 2\s*$/)) hits.push({ kind: "hygiene-ssh-v2", severity: "warning", title: "SSH version 2 is not enforced", description: "The configuration does not pin SSH to version 2, so version 1 may be accepted.", evidence: [absent("'ip ssh version 2'")], cause: "SSH was enabled without restricting the version.", action: "Add 'ip ssh version 2'." });
+  if (!has(/^ip ssh version 2\s*$/)) hits.push({ kind: "hygiene-ssh-v2", severity: "warning", title: "SSH version 2 is not enforced", description: "The configuration does not pin SSH to version 2, so version 1 may be accepted.", evidence: [absent("'ip ssh version 2'")], cause: "SSH was enabled without restricting the version.", action: "Add 'ip ssh version 2'.", fix: { summary: "Pin SSH to version 2", note: null, commands: ["ip ssh version 2"] } });
 
   // VTY lines: telnet allowed, explicitly or by leaving transport input at its default.
   const vtyBlocks: { header: string; body: string[] }[] = [];
   lines.forEach((l, i) => { if (/^line vty\b/.test(l)) { const body: string[] = []; for (let j = i + 1; j < lines.length && /^\s/.test(lines[j]); j++) body.push(lines[j].trim()); vtyBlocks.push({ header: l.trim(), body }); } });
   for (const b of vtyBlocks) {
     const ti = b.body.find((l) => /^transport input\b/.test(l));
-    if (ti && /\b(telnet|all)\b/.test(ti)) hits.push({ kind: "hygiene-telnet", severity: "warning", title: `Telnet is allowed on ${b.header}`, description: `${b.header} accepts Telnet, which sends credentials in clear text.`, evidence: [b.header, ti], cause: "transport input allows telnet or all.", action: "Use 'transport input ssh'." });
-    else if (!ti) hits.push({ kind: "hygiene-telnet-default", severity: "info", title: `${b.header} does not restrict the transport`, description: "No 'transport input' line, so the platform default applies, which may include Telnet.", evidence: [b.header, absent("'transport input'")], cause: "transport input was left at its default.", action: "Add 'transport input ssh'." });
+    if (ti && /\b(telnet|all)\b/.test(ti)) hits.push({ kind: "hygiene-telnet", severity: "warning", title: `Telnet is allowed on ${b.header}`, description: `${b.header} accepts Telnet, which sends credentials in clear text.`, evidence: [b.header, ti], cause: "transport input allows telnet or all.", action: "Use 'transport input ssh'.", fix: { summary: `Allow only SSH on ${b.header}`, note: "This stops Telnet logins on these lines. Make sure you, and Tiny Snitch, reach the device over SSH first; the preview warns if the change would cut off Tiny Snitch's own access.", commands: [b.header, "transport input ssh"] } });
+    else if (!ti) hits.push({ kind: "hygiene-telnet-default", severity: "info", title: `${b.header} does not restrict the transport`, description: "No 'transport input' line, so the platform default applies, which may include Telnet.", evidence: [b.header, absent("'transport input'")], cause: "transport input was left at its default.", action: "Add 'transport input ssh'.", fix: { summary: `Allow only SSH on ${b.header}`, note: "This stops Telnet logins on these lines. Make sure you, and Tiny Snitch, reach the device over SSH first; the preview warns if the change would cut off Tiny Snitch's own access.", commands: [b.header, "transport input ssh"] } });
   }
 
   const enablePw = has(/^enable password\b/);
@@ -190,7 +200,7 @@ export function baseline(config: string): Hit[] {
   if (snmp.length) hits.push({ kind: "hygiene-snmp-default", severity: "warning", title: "SNMP uses a default community string", description: "A well-known community string ('public' or 'private') is configured.", evidence: snmp.slice(0, 3), cause: "A default SNMP community was left in place.", action: "Replace it with SNMPv3 or a long random community, and restrict it with an ACL." });
 
   const http = has(/^ip http server\s*$/);
-  if (http) hits.push({ kind: "hygiene-http-server", severity: "warning", title: "The HTTP server is enabled", description: "'ip http server' exposes a clear-text management interface.", evidence: [http.trim()], cause: "The HTTP server was turned on.", action: "Use 'no ip http server', and 'ip http secure-server' only if you need it." });
+  if (http) hits.push({ kind: "hygiene-http-server", severity: "warning", title: "The HTTP server is enabled", description: "'ip http server' exposes a clear-text management interface.", evidence: [http.trim()], cause: "The HTTP server was turned on.", action: "Use 'no ip http server', and 'ip http secure-server' only if you need it.", fix: { summary: "Turn the HTTP server off", note: "Anything that uses the device's web interface stops working. The HTTPS server, if enabled, is left alone.", commands: ["no ip http server"] } });
 
   if (!has(/^ntp (server|peer|master)\b/)) hits.push({ kind: "hygiene-ntp", severity: "info", title: "No NTP source is configured", description: "Without synchronised time, logs from different devices cannot be correlated.", evidence: [absent("'ntp server'")], cause: "NTP was not configured.", action: "Add at least one 'ntp server'." });
   if (!has(/^logging (host )?\d+\.\d+\.\d+\.\d+/) && !has(/^logging host\b/)) hits.push({ kind: "hygiene-logging", severity: "info", title: "No remote syslog server is configured", description: "Logs stay on the device and are lost on reload.", evidence: [absent("'logging host'")], cause: "Remote logging was not configured.", action: "Add 'logging host <address>'." });
@@ -257,7 +267,8 @@ export function extraFindings(inputs: ExtraInput[], links: TopoLink[], mk: MakeF
         evidence: [ev(i.node.label, "show ip bgp summary", p.raw), ...(cfgLine ? [ev(i.node.label, CFG, cfgLine)] : []), ev(o.node.label, "show ip bgp summary", header)],
         probableCause: `The remote-as on ${i.node.label} was mistyped, or ${o.node.label} was given the wrong AS.`,
         recommendedAction: `Set "neighbor ${p.neighbor} remote-as ${theirs}" on ${i.node.label}, or correct the AS on ${o.node.label} if that is the one that is wrong.`,
-        verification: `Confirmed from show ip bgp summary on both routers${cfgLine ? " and the neighbor line in the configuration" : ""}.` }));
+        verification: `Confirmed from show ip bgp summary on both routers${cfgLine ? " and the neighbor line in the configuration" : ""}.`,
+        ...bgpFix(i.node.platform, localAs(i.bgpText), p.neighbor, theirs, i.node.label, o.node.label) }));
     }
   }
 
@@ -313,7 +324,7 @@ export function extraFindings(inputs: ExtraInput[], links: TopoLink[], mk: MakeF
     if (opts.compliance) {
       for (const h of baseline(i.configText)) {
         out.push(mk({ ...base(i), kind: h.kind, severity: h.severity, status: "confirmed", title: h.title, description: `${h.description} (${label})`, evidence: h.evidence.map((e) => (e.startsWith("(") ? ev(label, CFG, e) : ev(label, CFG, e))),
-          probableCause: h.cause, recommendedAction: h.action, verification: `Confirmed from ${CFG} on ${label}.` }));
+          probableCause: h.cause, recommendedAction: h.action, verification: `Confirmed from ${CFG} on ${label}.`, ...(h.fix ? { fix: h.fix } : {}) }));
       }
     }
   }

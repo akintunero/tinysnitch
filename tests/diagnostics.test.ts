@@ -110,6 +110,7 @@ describe("interface checks", () => {
     const f = r.findings.find((x) => x.kind === "interface-admin-down")!;
     expect(f).toMatchObject({ device: "R2", interface: G0, status: "confirmed", severity: "warning", linkId: "l1", peer: { device: "R1" } });
     expect(f.evidence[0]).toContain(`R2# ${CMD.brief}: ${G0} 10.0.12.2 administratively down/down`);
+    expect(f.fix).toEqual({ summary: `Enable ${G0} on R2`, note: expect.stringContaining('not intentional'), commands: [`interface ${G0}`, 'no shutdown'] });
     const down = r.findings.find((x) => x.kind === "interface-down")!;
     expect(down).toMatchObject({ device: "R1", severity: "critical" });
     expect(down.probableCause).toMatch(/R2 GigabitEthernet0\/0 is administratively down/);

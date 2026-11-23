@@ -137,6 +137,14 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX service_history_service ON service_history(service_id, id);
   `,
+  `
+  -- A change filed to fix a finding, so the finding can show where its fix stands and a second fix is not filed on top of an open one.
+  CREATE TABLE finding_fixes (
+    finding_id TEXT NOT NULL, scope_id TEXT NOT NULL, change_id TEXT NOT NULL, created_at TEXT NOT NULL, created_by TEXT,
+    PRIMARY KEY (finding_id, change_id)
+  );
+  CREATE INDEX finding_fixes_scope ON finding_fixes(scope_id, created_at);
+  `,
 ];
 
 export function resolveDatabasePath(url: string | undefined, cwd = process.cwd()): string {

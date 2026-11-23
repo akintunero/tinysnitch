@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { deriveFromRun } from "@/lib/diagnostics/state";
 import { runDiagnostics } from "@/lib/diagnostics/engine";
+import { fixChangesFor } from "@/lib/diagnostics/fix";
 import { clearDiagnostics, latestRun, openFindings } from "@/lib/diagnostics/store";
 import { addAudit } from "@/lib/database/repo";
 import { getContext } from "@/lib/server/context";
@@ -32,7 +33,7 @@ export const GET = route(async (_req, params) => {
       topologyError = e instanceof Error ? e.message : "The topology could not be read.";
     }
   }
-  return json({ run, findings, ...derived, topologyError });
+  return json({ run, findings, ...derived, topologyError, fixChanges: fixChangesFor(db, id) });
 });
 
 const body = z.object({ pings: z.boolean().optional() }).strict();

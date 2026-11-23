@@ -102,7 +102,8 @@ export function analyse(topology: Topology, snapshots: Map<string, DeviceSnapsho
           findings.push(mk({ ...base, kind: "interface-admin-down", severity: "warning", status: "confirmed", title: "Interface administratively down",
             description: `${e.iface} on ${d.node.label} is shut down, but the interface it connects to (${e.pNode.label} ${e.pIface}) is not.`,
             evidence: [briefLine(d, o), ...(e.p ? [briefLine(e.p, po)] : [])], probableCause: "Someone ran shutdown on this interface, or it was never enabled.",
-            recommendedAction: `If the link should carry traffic, enable ${e.iface} on ${d.node.label} (no shutdown) after review.`, verification: `Confirmed from ${CMD.brief} on ${d.node.label}.` }));
+            recommendedAction: `If the link should carry traffic, enable ${e.iface} on ${d.node.label} (no shutdown) after review.`, verification: `Confirmed from ${CMD.brief} on ${d.node.label}.`,
+            ...(["ios", "eos", "nxos", undefined].includes(d.node.platform) ? { fix: { summary: `Enable ${e.iface} on ${d.node.label}`, note: "Only if the shutdown was not intentional: the other end of this link is up.", commands: [`interface ${e.iface}`, "no shutdown"] } } : {}) }));
         }
       } else if (o.status === "down" || o.protocol === "down") {
         const peerShut = po?.status === "administratively down";

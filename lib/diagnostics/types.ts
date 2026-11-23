@@ -6,6 +6,13 @@ export type Severity = "critical" | "warning" | "info";
  */
 export type FindingStatus = "confirmed" | "suspected";
 
+/**
+ * Configuration lines that would clear a finding, on the finding's own device. Present only where the fix is not a guess:
+ * one correct answer, not a choice between two ends of a link or between values. It is never applied from here; it can be
+ * filed as an ordinary change that a person approves.
+ */
+export type Fix = { summary: string; /** What to check before filing it, or null. */ note: string | null; commands: string[] };
+
 export type Finding = {
   /** Stable across runs, so a problem that persists keeps its identity. */
   id: string;
@@ -25,6 +32,8 @@ export type Finding = {
   recommendedAction: string;
   /** How the finding was established, or the command that would settle it. */
   verification: string;
+  /** A fix that can be filed as a change, for the few findings that have one answer. */
+  fix?: Fix;
 };
 
 export type IfaceObservation = { status: "up" | "down" | "administratively down" | "deleted" | string; protocol: "up" | "down" | string; ip: string | null };
