@@ -187,9 +187,9 @@ export function DiagnosticsView({ labId, labTitle }: { labId: string; labTitle: 
           <section className="mt-8 border-t border-line pt-4" aria-label="Explanation">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-[14px] font-semibold">Explanation</h2>
-              <Button onClick={() => void explain()} disabled={explaining}>{explaining ? "Asking Claude" : run_.interpretation ? "Explain again" : "Explain findings"}</Button>
+              <Button onClick={() => void explain()} disabled={explaining}>{explaining ? "Asking the AI model" : run_.interpretation ? "Explain again" : "Explain findings"}</Button>
             </div>
-            <p className="text-soft mb-2 text-[12px]">Claude explains the findings above. It cannot add findings or change anything.</p>
+            <p className="text-soft mb-2 text-[12px]">The AI model explains the findings above. It cannot add findings or change anything.</p>
             {run_.interpretation ? <div className="text-[14px]"><Markdown>{run_.interpretation}</Markdown></div> : null}
           </section>
         </>

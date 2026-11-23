@@ -46,7 +46,7 @@ export async function runChat(
   const { db, mcp } = ctx;
   const settings = getSettings(db);
   const model = ctx.claude.model;
-  if (!model) throw new Error("Claude has no model configured.");
+  if (!model) throw new Error("No AI model is configured.");
 
   let conv = input.conversationId ? getConversation(db, input.conversationId) : null;
   if (input.conversationId && !conv) throw new UnknownConversationError();

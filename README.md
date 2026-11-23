@@ -6,8 +6,8 @@ An AI-assisted network engineering workbench. It reads your network, finds fault
 output they rest on, and applies configuration changes only after you approve them, with a snapshot first,
 read-back verification and rollback. It works with Cisco Modeling Labs and with real devices over SSH.
 
-The Anthropic API key, the MCP credentials and device credentials stay on the server. They are never sent to the
-browser, and they are masked in logs, in the activity feed and before any device output reaches Claude.
+The AI model API key, the MCP credentials and device credentials stay on the server. They are never sent to the
+browser, and they are masked in logs, in the activity feed and before any device output reaches the AI model.
 
 **New here? Start with the [usage guide](docs/USAGE.md):** connecting networks and real devices, SSH keys, discovery, everyday
 workflows, settings, securing a deployment and troubleshooting. This README is the reference for how each part works.
@@ -18,8 +18,8 @@ workflows, settings, securing a deployment and troubleshooting. This README is t
 |---|---|
 | **Networks** | Every network from every source: CML labs, sites in an inventory file, NetBox sites, discovery crawls. Each is marked lab or production. |
 | **Topology** | The real devices and links, drawn from the source. Link colours come from what devices reported, never from a guess. |
-| **Network Assistant** | Ask in plain language. Claude reads the network through tools and answers from the output. It cannot change a device; it can file a change proposal. |
-| **Diagnostics** | Deterministic read-only checks. Every finding quotes device output and is **confirmed** or **suspected**. Claude can explain findings but cannot add any. |
+| **Network Assistant** | Ask in plain language. The AI model reads the network through tools and answers from the output. It cannot change a device; it can file a change proposal. |
+| **Diagnostics** | Deterministic read-only checks. Every finding quotes device output and is **confirmed** or **suspected**. The AI model can explain findings but cannot add any. |
 | **Configurations** | Propose, preview, approve, schedule, apply, verify, roll back. Staged rollout, maintenance windows, provisioning of new devices. |
 | **Backups** | Versioned running configurations, diffs, and drift: changes nobody made through Tiny Snitch. Optional schedule. |
 | **Activity** | An audit log of everything: reads, proposals, approvals, deployments, errors. |
@@ -342,7 +342,7 @@ Stated plainly, so nothing is assumed:
   beyond the IOS CDP capture. The NX-API `copy running-config startup-config` save is best-effort and unconfirmed.
 - **Verified only against sample files and mocked responses:** the NetBox provider; the Ansible inventory import (sample inventories written from Ansible's documented formats, not your own); and the playbook export, whose YAML is checked but which has **not been run by Ansible**.
 - **Not run:** `docker compose up` with a real `.env.local`. The Dockerfile and compose file are checked statically (loopback-only port, non-root, no secrets baked in), but the Docker engine was not running when they were written, so `docker compose up --build` has not been tried.
-- **Not implemented:** Kubernetes (deployment or management; sign-in exists now, but there is no TLS of its own, no SSO and no multi-replica support, so it would need a TLS-terminating proxy and a single replica), Ansible as the way changes are pushed, RESTCONF, NETCONF for platforms other than Junos, SNMP/telemetry, SSO, LDAP and two-factor sign-in, interface error counters, and a model-provider choice (the assistant is Claude-only).
+- **Not implemented:** Kubernetes (deployment or management; sign-in exists now, but there is no TLS of its own, no SSO and no multi-replica support, so it would need a TLS-terminating proxy and a single replica), Ansible as the way changes are pushed, RESTCONF, NETCONF for platforms other than Junos, SNMP/telemetry, SSO, LDAP and two-factor sign-in, interface error counters, and a model-provider choice (today the assistant works only with the Anthropic API, though it is meant to accept any model you choose).
 
 ## The interface
 
@@ -354,16 +354,16 @@ diagnostics history, delete conversations, and trim the activity log (administra
 
 - Credentials never appear in API responses, the activity log or error messages (they are redacted before storage).
 - Inventory files hold references to secrets, not secrets; a literal password is rejected on load.
-- Device and MCP output is untrusted: it is wrapped as data before Claude sees it, and masked for secrets.
+- Device and MCP output is untrusted: it is wrapped as data before the AI model sees it, and masked for secrets.
 - The read-only command allowlist (`show`, `ping`, `traceroute`; one command per call; no chaining or redirection) is enforced
   inside every transport, so no caller can widen it.
 - Configuration lines that erase, reload, copy files, change keys, enable debug or clear state are never sent, whoever approved them.
 - `NODE_TLS_REJECT_UNAUTHORIZED=0` in `CML_MCP_ENV` disables certificate checks for the MCP child process only.
-- What leaves your network: device output and topology are sent to the Anthropic API when you use the assistant or "Explain findings".
+- What leaves your network: device output and topology are sent to the AI model provider you configure (today that is the Anthropic API) when you use the assistant or "Explain findings".
   Secrets are always masked. By default, for production networks, identifying data is masked too (Settings, "Hide identifying data
-  from Claude"; also available for all networks, or off):
+  from the AI model"; also available for all networks, or off):
   - IPv4 and IPv6 addresses, device and network names, MAC addresses, user and domain names are replaced with stand-ins before the
-    request, and put back in what you read. Addresses in one subnet stay in one subnet and private ranges stay private, so Claude can
+    request, and put back in what you read. Addresses in one subnet stay in one subnet and private ranges stay private, so the model can
     still reason about adjacency. The last octet of an IPv4 address is kept (and any longer run of zero bits), so a network address
     stays a valid network address and subnet arithmetic still works; the rest of the address is replaced. Subnet masks, wildcard
     masks, multicast and loopback are left alone as they identify nothing.
@@ -373,13 +373,13 @@ diagnostics history, delete conversations, and trim the activity log (administra
     built-in list or on your "safe words" list in Settings is treated as identifying and replaced. NTP, syslog and AAA server
     names and public AS numbers are replaced too; private AS numbers are left alone, and a replaced AS number looks like a 32-bit
     private one.
-  - Words you list in Settings ("Words to always hide from Claude") are replaced wherever they occur: customer, site or project names
+  - Words you list in Settings ("Words to always hide from the AI model") are replaced wherever they occur: customer, site or project names
     that nothing in a configuration declares.
   - Interface descriptions, SNMP location and contact lines, and banners are removed outright.
   - The mapping is kept in this server's memory only. Each request is recorded in Activity with how much was replaced, never the content.
   - Not masked: VLAN IDs, interface names, vendor and software versions, route and ACL structure, and any identifying text in places
     this does not recognise (a customer name inside free text that is not on your list, a device name that no topology, inventory or
     `hostname` line tells the app about). Treat masking as a strong reduction in what is exposed, not a guarantee of anonymity. For
-    stricter control, leave the assistant unconfigured: diagnostics, backups, drift and the change workflow do not use Claude.
+    stricter control, leave the assistant unconfigured: diagnostics, backups, drift and the change workflow do not use an AI model.
   - The setting is read on every request, so switching it mid-conversation takes effect on the next message; earlier messages are
     stored with the real values and masked (or not) as each request is sent.

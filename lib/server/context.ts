@@ -108,18 +108,18 @@ export async function verifyClaude(): Promise<ClaudeState> {
   c.checkedAt = new Date().toISOString();
   if (!ctx.anthropic || !c.model) {
     c.verification = "error";
-    c.error = c.configError ?? "Claude is not configured.";
+    c.error = c.configError ?? "No AI model is configured.";
     return c;
   }
   try {
     await ctx.anthropic.messages.create({ model: c.model, max_tokens: 8, messages: [{ role: "user", content: "ping" }] });
     c.verification = "ok";
     c.error = null;
-    addAudit(ctx.db, { kind: "claude", summary: `Claude API verified (${c.model})` });
+    addAudit(ctx.db, { kind: "claude", summary: `AI model verified (${c.model})` });
   } catch (e) {
     c.verification = "error";
     c.error = describeApiError(e);
-    addAudit(ctx.db, { kind: "claude", summary: `Claude API check failed`, data: { detail: c.error } });
+    addAudit(ctx.db, { kind: "claude", summary: `AI model check failed`, data: { detail: c.error } });
   }
   return c;
 }

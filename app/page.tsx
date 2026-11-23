@@ -105,7 +105,7 @@ export default function Overview() {
             <Row label="Tools discovered">{mcp?.toolCount ?? 0}</Row>
             {mcp?.endpoint ? <Row label="Transport"><span className="block text-left font-mono text-[12px] [overflow-wrap:anywhere]">{mcp.endpoint}</span></Row> : null}
             {mcp?.lastError ? <Row label="Last error"><span className="text-bad">{mcp.lastError}</span></Row> : null}
-            <Row label="Claude API"><StatusDot tone={claudeTone(claude)} label={claudeLabel(claude)} /></Row>
+            <Row label="AI model"><StatusDot tone={claudeTone(claude)} label={claudeLabel(claude)} /></Row>
             {claude?.model ? <Row label="Model"><span className="font-mono text-[12px]">{claude.model}</span></Row> : null}
             {claude && !claude.configured ? <Row label="Configuration"><span className="text-bad">{claude.configError}</span></Row> : null}
           </dl>

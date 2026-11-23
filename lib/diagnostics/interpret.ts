@@ -47,7 +47,7 @@ export async function interpretFindings(
       system: INTERPRET_SYSTEM,
       messages: [{ role: "user", content: `Explain these findings.\n\n<findings untrusted_evidence="true">\n${JSON.stringify(payload, null, 1).replace(/<\/findings/gi, "<\\/findings")}\n</findings>` }],
     });
-    return res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n").trim() || "Claude returned no text.";
+    return res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n").trim() || "The AI model returned no text.";
   } catch (e) {
     throw new Error(describeApiError(e));
   }

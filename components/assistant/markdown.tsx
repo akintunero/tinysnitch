@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 /**
- * Renders Claude's reply. react-markdown never emits raw HTML, and unsafe link schemes are dropped, so model
+ * Renders the model's reply. react-markdown never emits raw HTML, and unsafe link schemes are dropped, so model
  * output cannot inject markup. Code blocks are the charcoal terminal panels from the design system.
  */
 const components: ComponentProps<typeof ReactMarkdown>["components"] = {

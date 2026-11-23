@@ -27,7 +27,7 @@ const recall = () => { try { return localStorage.getItem(KEY); } catch { return 
 
 const fromStored =(m: StoredMessage): UiMessage => ({ key: `s${m.id}`, role: m.role, parts: m.parts, error: m.error, streaming: false });
 
-/** Whether what is sent to Claude is masked for a network. Mirrors the server: an unknown environment counts as production. */
+/** Whether what is sent to the AI model is masked for a network. Mirrors the server: an unknown environment counts as production. */
 export const isMasked = (mode: string, environment: string | null) => mode === "all" || (mode === "production" && environment !== "lab");
 
 /** Says, where the question is typed, what leaves this server and what does not. */

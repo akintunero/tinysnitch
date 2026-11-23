@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 type ToolPart = Extract<Part, { type: "tool" }>;
 
-/** A one-line summary of what was asked of the lab, so the engineer can see what Claude actually did. */
+/** A one-line summary of what was asked of the lab, so the engineer can see what the assistant actually did. */
 export function describeCall(tool: string, input: unknown): string {
   const args = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const command = typeof args.commands === "string" ? args.commands : typeof args.command === "string" ? args.command : null;

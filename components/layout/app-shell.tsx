@@ -68,7 +68,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </div>
         )}
         <div className="flex items-center justify-between text-[12px]">
-          <span className="text-soft">Claude API</span>
+          <span className="text-soft">AI model</span>
           <StatusDot tone={claudeTone(status?.claude)} label={claudeLabel(status?.claude)} />
         </div>
         <div className="pt-1">{link("/settings", "Settings", SettingsIcon)}</div>

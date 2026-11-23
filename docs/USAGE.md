@@ -29,7 +29,7 @@ companion. Where something has only been tested against fakes and not real hardw
 | **Network** | A group of devices managed together: a CML lab, a *site* in your inventory file, a NetBox site, an Ansible group or a discovery crawl. Everything in the app works on the network you have selected in the header. |
 | **Environment** | Every network is **lab** or **production**. Production changes always need a person's approval, run staged, and respect the maintenance window. |
 | **Device** | A router or switch (`ios`, `eos`, `nxos`, `junos`). Tiny Snitch only inspects supported routers and switches; anything else is reported as "not inspected". |
-| **Finding** | Something wrong that a deterministic check found, with the device output it rests on. **Confirmed** means the output proves it; **suspected** means it is likely but something could explain it. Claude can explain findings but cannot add any. |
+| **Finding** | Something wrong that a deterministic check found, with the device output it rests on. **Confirmed** means the output proves it; **suspected** means it is likely but something could explain it. The AI model can explain findings but cannot add any. |
 | **Change** | A set of configuration lines for one or more devices, taken through propose, preview, approve, snapshot, apply, verify, roll back. |
 | **Service** | Something you provision from a form (a VLAN, a BGP neighbour, an NTP server). It is remembered as a *service instance* that follows its change, so you can see whether it is really in place, change it or take it away. |
 | **Backup** | A stored copy of a device's running configuration. A difference nobody made through Tiny Snitch is **drift**. |
@@ -270,7 +270,7 @@ you choose.
 | **Overview** | Where things stand across the selected network. |
 | **Networks** | Every network from every source, with environment, size and state. Select one here or in the header. |
 | **Topology** | Devices and links drawn from the source. Link colours come from what the devices reported, never from a guess. |
-| **Assistant** | Ask in plain language. Claude reads the network through read-only tools and answers from the output. It can file a change *proposal*; it cannot apply anything. |
+| **Assistant** | Ask in plain language. The AI model reads the network through read-only tools and answers from the output. It can file a change *proposal*; it cannot apply anything. |
 | **Services** | Provision services from a form, see which are in place, change or take them away, and open "Running on the devices" for a per-device summary of what each configuration runs. |
 | **Configurations** | The change workflow: propose, preview, approve, schedule, apply, verify, roll back. Also has *Provision new devices* and *Clear finished*. |
 | **Diagnostics** | Read-only checks, a history chart and an "Explain findings" button. Each finding has evidence, a probable cause and sometimes a proposed fix. |
@@ -403,9 +403,9 @@ off under Settings, Changes. Sign-offs and withdrawals are recorded in Activity.
 
 | Tab | What is there |
 |---|---|
-| **Connections** | Status of the Claude API, CML, the inventory file, Ansible, discovery and NetBox, with the last error. |
+| **Connections** | Status of the AI model connection, CML, the inventory file, Ansible, discovery and NetBox, with the last error. |
 | **Changes** | Default execution mode (Suggest, Approve and deploy, Autopilot), "Let Autopilot apply configuration changes", the maintenance window, and whether the compliance checks run on all networks, only production or none. (The backup and diagnostics schedules are on the Backups page.) |
-| **Privacy** | "Hide identifying data from Claude" (production only, all networks or off), "Words to always hide from Claude" and "Words that are safe to show Claude". |
+| **Privacy** | "Hide identifying data from the AI model" (production only, all networks or off), "Words to always hide from the AI model" and "Words that are safe to show the AI model". |
 | **People** | Turn login on, create users, set roles, reset passwords, disable users. |
 | **API** | Create and revoke API tokens, manage webhooks, view delivery logs, link to the OpenAPI document. |
 
@@ -450,15 +450,15 @@ Not available yet: a secrets vault (secrets are env variables or files), built-i
 
 ## 9. The assistant and what leaves your network
 
-The assistant and "Explain findings" send device output and topology to the Anthropic API. Secrets are always masked first. By
+The assistant and "Explain findings" send device output and topology to the AI model provider you configure (today the Anthropic API). Secrets are always masked first. By
 default, for production networks, **identifying data is masked too**: IP and MAC addresses, device and network names, user and domain
 names are replaced with stand-ins before the request and put back in what you read. Addresses in one subnet stay in one subnet, so
-Claude can still reason about adjacency. Object names (route-maps, prefix-lists, ACLs, VRFs) are split into words, generic purpose words
+The model can still reason about adjacency. Object names (route-maps, prefix-lists, ACLs, VRFs) are split into words, generic purpose words
 stay, and the rest are replaced. Interface descriptions, SNMP location/contact and banners are removed outright.
 
 Masking is a strong reduction in what is exposed, not a guarantee of anonymity: VLAN IDs, interface names, versions, route and ACL
 structure, and identifying text in places it does not recognise are not masked. Add customer or site names to "Words to always hide".
-Diagnostics, backups, drift and the change workflow do not use Claude at all, so leaving the assistant unconfigured is a fully
+Diagnostics, backups, drift and the change workflow do not use an AI model at all, so leaving the assistant unconfigured is a fully
 supported mode.
 
 The assistant page says, above the message box, whether the selected network is being pseudonymised, and warns in amber when it is not.

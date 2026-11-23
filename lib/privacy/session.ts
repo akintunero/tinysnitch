@@ -33,7 +33,7 @@ export function auditPrivacy(db: Db, what: string, p: Pseudonymiser | null, scop
   addAudit(db, {
     kind: "claude",
     actor: "system",
-    summary: p ? `${what}: sent to Claude with identifying data replaced (${p.describe()})` : `${what}: sent to Claude without masking`,
+    summary: p ? `${what}: sent to the AI model with identifying data replaced (${p.describe()})` : `${what}: sent to the AI model without masking`,
     data: { scopeId, pseudonymised: !!p, ...(p ? p.stats : {}) },
   });
 }

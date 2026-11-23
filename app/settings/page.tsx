@@ -73,7 +73,7 @@ export default function Settings() {
     setNote(null);
     try {
       await apiSend("POST", kind === "reconnect" ? "/api/mcp/reconnect" : "/api/claude/verify");
-      setNote(kind === "reconnect" ? "Reconnected to the CML MCP server." : "Claude API check passed.");
+      setNote(kind === "reconnect" ? "Reconnected to the CML MCP server." : "AI model check passed.");
     } catch (e) {
       setNote((e as Error).message);
     } finally {
@@ -106,7 +106,7 @@ export default function Settings() {
       </nav>
 
       <div hidden={tab !== "connections"}>
-      <Section title="Claude">
+      <Section title="AI model">
         <dl>
           <Row label="API connection"><StatusDot tone={claudeTone(claude)} label={claudeLabel(claude)} /></Row>
           <Row label="Model"><span className="font-mono text-[12px]">{claude?.model ?? "not set"}</span></Row>
@@ -182,20 +182,20 @@ export default function Settings() {
       </div>
 
       <div hidden={tab !== "privacy"}>
-        <Section title="Sending data to Claude">
+        <Section title="Sending data to the AI model">
           {!settings ? <p className="text-soft text-[13px]">Loading...</p> : (
             <div className="space-y-4">
               <label className="block">
-                <span className="text-[13px] font-medium">Hide identifying data from Claude</span>
+                <span className="text-[13px] font-medium">Hide identifying data from the AI model</span>
                 <select value={settings.llmPrivacy} onChange={(e) => void save({ llmPrivacy: e.target.value as PrivacyMode })} className="mt-1 block h-8 rounded-sm border border-line bg-bg px-2 text-[13px]">
                   <option value="production">Production networks only (default)</option>
                   <option value="all">All networks, labs included</option>
                   <option value="off">Off: send real values</option>
                 </select>
-                <span className="text-soft block text-[12px]">IP and IPv6 addresses, device and network names, MAC addresses, user and domain names, descriptions and banners are replaced with stand-ins before anything is sent to Claude, and put back in what you read. Addresses in the same subnet stay in the same subnet, so Claude can still reason about the topology. The mapping stays in this server's memory. Credentials are always removed. Each request is recorded in Activity with what was replaced.</span>
+                <span className="text-soft block text-[12px]">IP and IPv6 addresses, device and network names, MAC addresses, user and domain names, descriptions and banners are replaced with stand-ins before anything is sent to the AI model, and put back in what you read. Addresses in the same subnet stay in the same subnet, so the model can still reason about the topology. The mapping stays in this server's memory. Credentials are always removed. Each request is recorded in Activity with what was replaced.</span>
               </label>
               <label className="block">
-                <span className="text-[13px] font-medium">Words to always hide from Claude</span>
+                <span className="text-[13px] font-medium">Words to always hide from the AI model</span>
                 <textarea
                   key={settings.llmPrivateTerms.join("|")}
                   defaultValue={settings.llmPrivateTerms.join("\n")}
@@ -207,7 +207,7 @@ export default function Settings() {
                 <span className="text-soft block text-[12px]">Names of route-maps, prefix-lists, ACLs, VRFs and similar objects, public AS numbers, hostnames and domains are found automatically. Add anything else that identifies a customer or site and would not be recognised, such as a name inside free text.</span>
               </label>
               <label className="block">
-                <span className="text-[13px] font-medium">Words that are safe to show Claude</span>
+                <span className="text-[13px] font-medium">Words that are safe to show the AI model</span>
                 <textarea
                   key={settings.llmSafeWords.join("|")}
                   defaultValue={settings.llmSafeWords.join("\n")}
@@ -216,7 +216,7 @@ export default function Settings() {
                   onBlur={(e) => void save({ llmSafeWords: e.target.value.split(/[\n,]/).map((t) => t.trim()).filter(Boolean).slice(0, 200) })}
                   className="mt-1 block w-full max-w-md rounded-sm border border-line bg-bg px-2 py-1.5 font-mono text-[12px] placeholder:text-muted"
                 />
-                <span className="text-soft block text-[12px]">Object names are split into words. Generic ones (IN, OUT, GUEST, UPLINK, MGMT and similar) are kept so Claude can read the purpose; any other word is replaced. Add words here that describe purpose in your naming, never a customer or site name.</span>
+                <span className="text-soft block text-[12px]">Object names are split into words. Generic ones (IN, OUT, GUEST, UPLINK, MGMT and similar) are kept so the model can read the purpose; any other word is replaced. Add words here that describe purpose in your naming, never a customer or site name.</span>
               </label>
             </div>
           )}

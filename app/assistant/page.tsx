@@ -23,7 +23,7 @@ export default function Assistant() {
     return (
       <>
         <PageHeader title="Network Assistant" />
-        <EmptyState title="Claude is not configured" action={<Link href="/settings" className="text-[13px] underline">Open Settings</Link>}>
+        <EmptyState title="No AI model is configured" action={<Link href="/settings" className="text-[13px] underline">Open Settings</Link>}>
           {status.claude.configError ?? "Set ANTHROPIC_API_KEY and ANTHROPIC_MODEL in .env.local and restart."}
         </EmptyState>
       </>
