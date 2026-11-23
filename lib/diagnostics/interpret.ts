@@ -1,5 +1,5 @@
-import type Anthropic from "@anthropic-ai/sdk";
-import { describeApiError } from "../anthropic/bridge";
+import { type MessagesClient, isText } from "../llm/types";
+import { describeApiError } from "../llm/loop";
 import { redactDeep } from "../security/redact";
 import type { Finding, RunSummary } from "./types";
 
@@ -17,9 +17,9 @@ const plain = (f: Finding) => ({
   title: f.title, description: f.description, evidence: f.evidence, probableCause: f.probableCause, verification: f.verification,
 });
 
-/** Claude explains the findings; it adds none. With nothing to explain it is not called at all. */
+/** The AI model explains the findings; it adds none. With nothing to explain it is not called at all. */
 export async function interpretFindings(
-  client: Pick<Anthropic, "messages">,
+  client: MessagesClient,
   model: string,
   input: { labTitle: string; findings: Finding[]; run: RunSummary },
 ): Promise<string> {
@@ -47,7 +47,7 @@ export async function interpretFindings(
       system: INTERPRET_SYSTEM,
       messages: [{ role: "user", content: `Explain these findings.\n\n<findings untrusted_evidence="true">\n${JSON.stringify(payload, null, 1).replace(/<\/findings/gi, "<\\/findings")}\n</findings>` }],
     });
-    return res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n").trim() || "The AI model returned no text.";
+    return res.content.filter(isText).map((b) => b.text).join("\n").trim() || "The AI model returned no text.";
   } catch (e) {
     throw new Error(describeApiError(e));
   }

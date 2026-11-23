@@ -1,10 +1,10 @@
 /**
- * Process-wide server state: the database, the MCP service and the Claude client. Kept on globalThis so
+ * Process-wide server state: the database, the MCP service and the AI model client. Kept on globalThis so
  * Next's dev reloads reuse one MCP connection instead of spawning a new child process each time.
  */
-import Anthropic from "@anthropic-ai/sdk";
-import { describeApiError } from "../anthropic/bridge";
-import { ConfigError, type McpConfig, describeMcp, loadAnthropicConfig, loadMcpConfig } from "../config";
+import { describeApiError } from "../llm/loop";
+import { ConfigError, type McpConfig, describeLlm, describeMcp, loadLlmConfig, loadMcpConfig } from "../config";
+import { type MessagesClient, createLlmClient } from "../llm";
 import { type Db, openDatabase } from "../database/db";
 import { addAudit } from "../database/repo";
 import { McpService, describeError } from "../mcp/service";
@@ -17,6 +17,9 @@ export type ClaudeState = {
   verification: "unverified" | "ok" | "error";
   checkedAt: string | null;
   error: string | null;
+  /** Which kind of provider and where it is, without any key. Absent until one is configured. */
+  provider?: string | null;
+  endpoint?: string | null;
 };
 
 export type Ctx = {
@@ -25,7 +28,8 @@ export type Ctx = {
   mcpConfig: McpConfig | null;
   mcpConfigError: string | null;
   claude: ClaudeState;
-  anthropic: Anthropic | null;
+  /** The AI model client, whichever provider is configured. */
+  llm: MessagesClient | null;
   lastConnectAttempt: number;
 };
 
@@ -55,17 +59,19 @@ function create(): Ctx {
   }
   const mcp = mcpConfig ? new McpService(mcpConfig, { onLog: makeMcpLogger(db) }) : null;
 
-  let anthropic: Anthropic | null = null;
+  let llm: MessagesClient | null = null;
   const claude: ClaudeState = { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null };
   try {
-    const c = loadAnthropicConfig();
-    anthropic = new Anthropic({ apiKey: c.apiKey });
+    const c = loadLlmConfig();
+    llm = createLlmClient(c);
     claude.configured = true;
     claude.model = c.model;
+    claude.provider = c.provider;
+    claude.endpoint = describeLlm(c);
   } catch (e) {
     claude.configError = e instanceof ConfigError ? e.message : describeError(e);
   }
-  return { db, mcp, mcpConfig, mcpConfigError, claude, anthropic, lastConnectAttempt: 0 };
+  return { db, mcp, mcpConfig, mcpConfigError, claude, llm, lastConnectAttempt: 0 };
 }
 
 export function getContext(): Ctx {
@@ -106,13 +112,13 @@ export async function verifyClaude(): Promise<ClaudeState> {
   const ctx = getContext();
   const c = ctx.claude;
   c.checkedAt = new Date().toISOString();
-  if (!ctx.anthropic || !c.model) {
+  if (!ctx.llm || !c.model) {
     c.verification = "error";
     c.error = c.configError ?? "No AI model is configured.";
     return c;
   }
   try {
-    await ctx.anthropic.messages.create({ model: c.model, max_tokens: 8, messages: [{ role: "user", content: "ping" }] });
+    await ctx.llm.messages.create({ model: c.model, max_tokens: 8, messages: [{ role: "user", content: "ping" }] });
     c.verification = "ok";
     c.error = null;
     addAudit(ctx.db, { kind: "claude", summary: `AI model verified (${c.model})` });

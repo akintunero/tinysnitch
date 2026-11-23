@@ -165,7 +165,7 @@ describe("the provisioning API", () => {
     const file = join(mkdtempSync(join(tmpdir(), "ts-prov-")), "inv.yaml");
     writeFileSync(file, "credentials:\n  c: { username: admin, password: env:TS_PROV_PW }\nsites:\n  - id: s\n    title: S\n    environment: lab\n    credential: c\n    devices:\n      - { name: R1, address: 127.0.0.1, port: 1, platform: ios }\n      - { name: J1, address: 127.0.0.2, port: 1, platform: junos }\n");
     const db = openDatabase(":memory:");
-    setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "x", lastConnectAttempt: 0, anthropic: null, claude });
+    setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "x", lastConnectAttempt: 0, llm: null, claude });
     setProviders([new StaticProvider(file)]);
     return db;
   }
@@ -207,7 +207,7 @@ describe("removing several changes at once", () => {
 
   it("removes what may go, skips and names what may not, and records it", async () => {
     const db = openDatabase(":memory:");
-    setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "x", lastConnectAttempt: 0, anthropic: null, claude });
+    setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "x", lastConnectAttempt: 0, llm: null, claude });
     const a = make(db, "verified");
     const b = make(db, "failed");
     const c = make(db, "deploying");

@@ -75,7 +75,7 @@ function install(claude?: Anthropic, opts: { claudeConfigured?: boolean } = {}) 
   calls = c;
   const mcp = new McpService(null, { transportFactory: () => { const [a, b] = InMemoryTransport.createLinkedPair(); void s.connect(b); return a; } });
   const ctx: Ctx = {
-    db: openDatabase(":memory:"), mcp, mcpConfig: null, mcpConfigError: null, lastConnectAttempt: 0, anthropic: claude ?? null,
+    db: openDatabase(":memory:"), mcp, mcpConfig: null, mcpConfigError: null, lastConnectAttempt: 0, llm: claude ?? null,
     claude: { configured: opts.claudeConfigured ?? !!claude, model: "test-model", configError: claude ? null : "Missing ANTHROPIC_API_KEY.", verification: "unverified", checkedAt: null, error: null },
   };
   setContext(ctx);
@@ -300,7 +300,7 @@ describe("chat turn", () => {
     const ac = new AbortController();
     ac.abort();
     const events: ChatEvent[] = [];
-    await runChat({ ...ctx, anthropic: ctx.anthropic!, mcp: ctx.mcp! }, { message: "hi", signal: ac.signal, emit: (e) => events.push(e) });
+    await runChat({ ...ctx, llm: ctx.llm!, mcp: ctx.mcp! }, { message: "hi", signal: ac.signal, emit: (e) => events.push(e) });
     expect(events.at(-1)).toEqual({ type: "error", message: "Stopped before it finished." });
   });
 });

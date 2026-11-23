@@ -4,7 +4,7 @@
  * withheld; changes go through the approval workflow built in Phase 6.
  */
 import { resolveCapabilities } from "../cml/capabilities";
-import type { BridgeTool } from "../anthropic/bridge";
+import type { BridgeTool } from "../llm/loop";
 import type { ToolInfo } from "../mcp/service";
 
 export type CommandPolicy = { tool: string; commandsArg: string; modeArg: string | null };

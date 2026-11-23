@@ -285,7 +285,7 @@ describe("diagnostics over SSH against an inventory file (no CML involved)", () 
     dir = mkdtempSync(join(tmpdir(), "ts-inv-"));
     const file = join(dir, "inventory.yaml");
     writeFileSync(file, INV.replace("{ name: R1, address: 127.0.0.1, platform: ios }", `{ name: R1, address: 127.0.0.1, port: ${r1.port}, platform: ios }`).replace("{ name: R2, address: 127.0.0.1, platform: ios }", `{ name: R2, address: 127.0.0.1, port: ${r2.port}, platform: ios }`));
-    setContext({ db: openDatabase(":memory:"), mcp: null, mcpConfig: null, mcpConfigError: "no cml", claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null }, anthropic: null, lastConnectAttempt: 0 });
+    setContext({ db: openDatabase(":memory:"), mcp: null, mcpConfig: null, mcpConfigError: "no cml", claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null }, llm: null, lastConnectAttempt: 0 });
     setProviders([new StaticProvider(file)]);
   });
   afterEach(() => { r1.close(); r2.close(); setProviders(null); setContext(undefined); });

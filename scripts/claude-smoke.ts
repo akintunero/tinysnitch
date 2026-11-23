@@ -1,20 +1,20 @@
 /**
- * Phase 1 smoke test: can Claude call a CML MCP tool through this app's bridge?
- * Only tools classified read-only are offered to Claude here.
+ * Smoke test: can the configured AI model call a CML MCP tool through this app's bridge?
+ * Only tools classified read-only are offered to the model here.
  *
  *   npm run claude:smoke
  *   npm run claude:smoke -- "How many nodes are in each lab?"
  */
-import Anthropic from "@anthropic-ai/sdk";
-import { ConfigError, loadAnthropicConfig, loadMcpConfig } from "../lib/config";
-import { describeApiError, runToolLoop } from "../lib/anthropic/bridge";
+import { ConfigError, loadLlmConfig, loadMcpConfig } from "../lib/config";
+import { createLlmClient } from "../lib/llm";
+import { describeApiError, runToolLoop } from "../lib/llm/loop";
 import { McpError, McpService } from "../lib/mcp/service";
 
 async function main(): Promise<number> {
   let mcpConfig, claude;
   try {
     mcpConfig = loadMcpConfig();
-    claude = loadAnthropicConfig();
+    claude = loadLlmConfig();
   } catch (e) {
     if (!(e instanceof ConfigError)) throw e;
     console.error(`Not configured: ${e.message}`);
@@ -33,7 +33,7 @@ async function main(): Promise<number> {
     console.log(`Offering ${readTools.length} read-only tool(s) of ${svc.tools().length} to ${claude.model}.`);
     const question = process.argv.slice(2).join(" ") || "List the labs available in CML and how many nodes and links each has.";
     const result = await runToolLoop({
-      client: new Anthropic({ apiKey: claude.apiKey }),
+      client: createLlmClient(claude),
       model: claude.model,
       messages: [{ role: "user", content: question }],
       tools: readTools,
@@ -51,7 +51,7 @@ async function main(): Promise<number> {
       if (t.kind === "tool_use") console.log(`  -> ${t.tool} ${JSON.stringify(t.input).slice(0, 120)}`);
       if (t.kind === "tool_result") console.log(`  <- ${t.tool} ${t.isError ? "ERROR " : ""}${t.preview.replace(/\s+/g, " ").slice(0, 100)}`);
     }
-    console.log(`\n${result.toolCalls} tool call(s). Claude says:\n\n${result.text}`);
+    console.log(`\n${result.toolCalls} tool call(s). The model says:\n\n${result.text}`);
     return result.toolCalls > 0 ? 0 : 1;
   } catch (e) {
     console.error(describeApiError(e));

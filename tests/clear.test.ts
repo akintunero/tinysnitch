@@ -17,7 +17,7 @@ import { setContext } from "@/lib/server/context";
 const claude = { configured: false, model: null, configError: null, verification: "unverified" as const, checkedAt: null, error: null };
 function boot() {
   const db = openDatabase(":memory:");
-  setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "x", lastConnectAttempt: 0, anthropic: null, claude });
+  setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "x", lastConnectAttempt: 0, llm: null, claude });
   return db;
 }
 afterEach(() => setContext(undefined));

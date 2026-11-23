@@ -51,7 +51,7 @@ function fakeCml(opts: { noLinksTool?: boolean; failInterfacesFor?: string } = {
 function install(opts: Parameters<typeof fakeCml>[0] = {}) {
   const { s, calls } = fakeCml(opts);
   const mcp = new McpService(null, { transportFactory: () => { const [a, b] = InMemoryTransport.createLinkedPair(); void s.connect(b); return a; } });
-  const ctx: Ctx = { db: openDatabase(":memory:"), mcp, mcpConfig: null, mcpConfigError: null, anthropic: null, lastConnectAttempt: 0,
+  const ctx: Ctx = { db: openDatabase(":memory:"), mcp, mcpConfig: null, mcpConfigError: null, llm: null, lastConnectAttempt: 0,
     claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null } };
   setContext(ctx);
   clearTopologyCache();

@@ -1,4 +1,4 @@
-import type { BridgeTool, ExecuteResult, ToolExecutor } from "../anthropic/bridge";
+import type { BridgeTool, ExecuteResult, ToolExecutor } from "../llm/loop";
 import { type InventoryProvider, nodeRef } from "../core/types";
 import type { Db } from "../database/db";
 import { addAudit } from "../database/repo";

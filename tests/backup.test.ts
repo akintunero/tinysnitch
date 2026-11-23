@@ -128,7 +128,7 @@ describe("backups of a real SSH device model", () => {
     writeFileSync(file, `credentials:\n  c: { username: admin, password: env:TS_TEST_PW }\nsites:\n  - id: s\n    title: S\n    environment: lab\n    credential: c\n    devices:\n      - { name: R1, address: 127.0.0.1, port: ${dev.port}, platform: ios, kind: router }\n      - { name: PC1, address: 127.0.0.1, port: ${dev.port}, platform: ios, kind: host }\n`);
     const db = openDatabase(":memory:");
     saveSettings(db, { executionMode: over.mode ?? "approve" });
-    setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "no cml", claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null }, anthropic: null, lastConnectAttempt: 0 });
+    setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "no cml", claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null }, llm: null, lastConnectAttempt: 0 });
     setProviders([new StaticProvider(file)]);
     return db;
   }
@@ -256,7 +256,7 @@ describe("the scheduler", () => {
       writeFileSync(file, `credentials:\n  c: { username: admin, password: env:TS_TEST_PW }\nsites:\n  - id: s\n    title: S\n    environment: lab\n    credential: c\n    devices:\n      - { name: R1, address: 127.0.0.1, port: ${dev.port}, platform: ios, kind: router }\n`);
       const db = openDatabase(":memory:");
       saveSettings(db, settings);
-      setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "no cml", claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null }, anthropic: null, lastConnectAttempt: 0 });
+      setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "no cml", claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null }, llm: null, lastConnectAttempt: 0 });
       setProviders([new StaticProvider(file)]);
       return db;
     }
@@ -293,7 +293,7 @@ describe("history", () => {
     expect(runHistory(openDatabase(":memory:"), "none")).toEqual([]);
   });
   it("answers through the API", async () => {
-    setContext({ db: openDatabase(":memory:"), mcp: null, mcpConfig: null, mcpConfigError: "x", claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null }, anthropic: null, lastConnectAttempt: 0 });
+    setContext({ db: openDatabase(":memory:"), mcp: null, mcpConfig: null, mcpConfigError: "x", claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null }, llm: null, lastConnectAttempt: 0 });
     const r = await historyGet(new Request("http://localhost/api/labs/x/history", { headers: { host: "localhost" } }), { params: Promise.resolve({ labId: "static:s" }) });
     expect(await r.json()).toEqual({ points: [] });
     setContext(undefined);

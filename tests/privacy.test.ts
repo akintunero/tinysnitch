@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
 import { describe, expect, it } from "vitest";
-import type { MessagesClient } from "@/lib/anthropic/bridge";
-import { runToolLoop } from "@/lib/anthropic/bridge";
+import type { MessagesClient } from "@/lib/llm/loop";
+import { runToolLoop } from "@/lib/llm/loop";
 import { pseudonymisingClient } from "@/lib/privacy/client";
 import { Pseudonymiser, StreamRestorer } from "@/lib/privacy/pseudonym";
 

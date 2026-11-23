@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { describe, expect, it } from "vitest";
-import { type BridgeTool, type MessagesClient, runToolLoop, toAnthropicTools } from "../lib/anthropic/bridge";
+import { type BridgeTool, type MessagesClient, runToolLoop, toLlmTools } from "../lib/llm/loop";
 
 type Reply = Pick<Anthropic.Message, "content" | "stop_reason">;
 const msg = (r: Reply) => ({ id: "m", type: "message", role: "assistant", model: "t", stop_sequence: null, usage: {}, ...r }) as unknown as Anthropic.Message;
@@ -80,9 +80,9 @@ describe("runToolLoop", () => {
   });
 });
 
-describe("toAnthropicTools", () => {
+describe("toLlmTools", () => {
   it("sanitises awkward names and maps back to the real one", () => {
-    const { list, toReal } = toAnthropicTools([{ name: "lab.get nodes", inputSchema: {} }, { name: "lab_get_nodes", inputSchema: {} }]);
+    const { list, toReal } = toLlmTools([{ name: "lab.get nodes", inputSchema: {} }, { name: "lab_get_nodes", inputSchema: {} }]);
     expect(list.every((t) => /^[a-zA-Z0-9_-]{1,64}$/.test(t.name))).toBe(true);
     expect(new Set(list.map((t) => t.name)).size).toBe(2);
     expect(toReal.get(list[0].name)).toBe("lab.get nodes");

@@ -1,4 +1,4 @@
-import type { ExecuteResult, ToolExecutor } from "../anthropic/bridge";
+import type { ExecuteResult, ToolExecutor } from "../llm/loop";
 import type { Db } from "../database/db";
 import { addAudit } from "../database/repo";
 import { McpError, type McpService } from "../mcp/service";

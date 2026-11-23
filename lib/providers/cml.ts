@@ -25,7 +25,7 @@ export function hasCliRunner(mcp: McpService): boolean {
   return findRunner(mcp) !== null;
 }
 
-const NO_RUNNER ="The lab MCP server has no tool Tiny Snitch can use to run CLI commands on nodes.";
+const NO_RUNNER ="The MCP server has no tool Tiny Snitch can use to run CLI commands on nodes.";
 
 /** Reaches a CML node's console through the MCP server's command tool. */
 export class CmlTransport implements DeviceTransport {
@@ -34,7 +34,7 @@ export class CmlTransport implements DeviceTransport {
 
   private async call(device: DeviceRef, commands: string, config: boolean): Promise<CommandOutcome> {
     const mcp = this.mcpOf();
-    if (!mcp) return { ok: false, text: "The lab MCP connection is not configured." };
+    if (!mcp) return { ok: false, text: "The MCP connection is not configured." };
     const r = findRunner(mcp);
     if (!r) return { ok: false, text: NO_RUNNER };
     const args: Record<string, unknown> = { [r.labArg]: this.labId, [r.labelArg]: device.label, [r.commandsArg]: commands };

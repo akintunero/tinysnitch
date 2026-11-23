@@ -1,5 +1,5 @@
-import type Anthropic from "@anthropic-ai/sdk";
-import { AbortedError, type MessagesClient, describeApiError, runToolLoop } from "../anthropic/bridge";
+import { AbortedError, type MessagesClient, describeApiError, runToolLoop } from "../llm/loop";
+import type { MessageParam } from "../llm/types";
 import { addAudit, getSettings } from "../database/repo";
 import type { Ctx } from "../server/context";
 import { createExecutor } from "./executor";
@@ -40,7 +40,7 @@ export class UnknownConversationError extends Error {}
  * happens, and store the result. A failed or stopped turn is still stored, so the transcript stays honest.
  */
 export async function runChat(
-  ctx: Ctx & { anthropic: NonNullable<Ctx["anthropic"]>; mcp: McpService | null },
+  ctx: Ctx & { llm: NonNullable<Ctx["llm"]>; mcp: McpService | null },
   input: { conversationId?: string; message: string; signal?: AbortSignal; emit: (e: ChatEvent) => void },
 ): Promise<void> {
   const { db, mcp } = ctx;
@@ -60,7 +60,7 @@ export async function runChat(
     addAudit(db, { kind: "request", actor: "user", summary: `Asked the assistant: ${input.message.replace(/\s+/g, " ").slice(0, 120)}`, data: { conversationId: conv.id, labId: settings.selectedLabId } });
     input.emit({ type: "conversation", id: conv.id, title: conv.title });
 
-    const messages: Anthropic.MessageParam[] = [...history];
+    const messages: MessageParam[] = [...history];
     const last = messages.at(-1);
     if (last?.role === "user") last.content = `${last.content as string}\n\n${input.message}`;
     else messages.push({ role: "user", content: input.message });
@@ -68,7 +68,7 @@ export async function runChat(
     // CML networks use the MCP server's own read tools; every other network goes through its provider and transport.
     const scoped = settings.selectedLabId ? providerFor(settings.selectedLabId).provider : null;
     const neutral = scoped && scoped.kind !== "cml" ? scoped : null;
-    if (!neutral && !mcp) throw new Error("The lab MCP connection is not available.");
+    if (!neutral && !mcp) throw new Error("The MCP connection is not available.");
     const cmlToolSet = neutral ? null : buildToolSet(mcp!.tools());
     const tools = neutral ? NEUTRAL_TOOLS : [...cmlToolSet!.tools, ...(settings.selectedLabId ? [PROPOSE_TOOL] : [])];
     const parts: Part[] = [];
@@ -80,7 +80,7 @@ export async function runChat(
     let stopReason: string | null = null;
     // Everything that crosses to Claude goes through one wrapper that swaps identifying data for stand-ins and back.
     const pseudo = await pseudonymiserFor(db, settings.selectedLabId, [settings.selectedLabTitle]);
-    const rawClient = ctx.anthropic as unknown as MessagesClient;
+    const rawClient: MessagesClient = ctx.llm;
     try {
       const result = await runToolLoop({
         client: pseudo ? pseudonymisingClient(rawClient, pseudo) : rawClient,

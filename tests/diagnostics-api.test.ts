@@ -79,7 +79,7 @@ function install(opts: { noCli?: boolean; anthropic?: Anthropic } = {}) {
   clearTopologyCache();
   const server = fakeCml(opts);
   const mcp = new McpService(null, { transportFactory: () => { const [a, b] = InMemoryTransport.createLinkedPair(); void server.connect(b); return a; } });
-  const ctx: Ctx = { db: openDatabase(":memory:"), mcp, mcpConfig: null, mcpConfigError: null, lastConnectAttempt: 0, anthropic: opts.anthropic ?? null,
+  const ctx: Ctx = { db: openDatabase(":memory:"), mcp, mcpConfig: null, mcpConfigError: null, lastConnectAttempt: 0, llm: opts.anthropic ?? null,
     claude: { configured: !!opts.anthropic, model: "test-model", configError: opts.anthropic ? null : "Missing ANTHROPIC_API_KEY.", verification: "unverified", checkedAt: null, error: null } };
   setContext(ctx);
   return ctx;

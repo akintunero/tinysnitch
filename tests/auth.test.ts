@@ -30,7 +30,7 @@ import { setContext } from "@/lib/server/context";
 import { type StatefulDevice, startStatefulDevice } from "./helpers/fake-device";
 
 const PW = "correct horse battery";
-const ctxWith = (db = openDatabase(":memory:")) => { setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "no cml", claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null }, anthropic: null, lastConnectAttempt: 0 }); return db; };
+const ctxWith = (db = openDatabase(":memory:")) => { setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "no cml", claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null }, llm: null, lastConnectAttempt: 0 }); return db; };
 
 describe("passwords", () => {
   it("hashes with a salt, verifies, and rejects a wrong or malformed one", async () => {

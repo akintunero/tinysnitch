@@ -84,7 +84,7 @@ describe("the impact API", () => {
     const file = join(mkdtempSync(join(tmpdir(), "ts-imp-")), "inv.yaml");
     writeFileSync(file, "credentials:\n  c: { username: admin, password: env:TS_IMP_PW }\nsites:\n  - id: s\n    title: S\n    environment: lab\n    credential: c\n    devices:\n      - { name: R1, address: 127.0.0.1, port: 1, platform: ios }\n      - { name: R2, address: 127.0.0.2, port: 1, platform: ios }\n");
     const db = openDatabase(":memory:");
-    setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "x", lastConnectAttempt: 0, anthropic: null, claude });
+    setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "x", lastConnectAttempt: 0, llm: null, claude });
     setProviders([new StaticProvider(file)]);
     const { service, change } = await createService({ scopeId: "static:s", serviceId: "routed-interface", name: "Uplink to R2", values: { interface: "GigabitEthernet0/1", address: "10.0.0.1/30" }, devices: ["R1"] });
     updateChange(db, change.id, { status: "verified" });

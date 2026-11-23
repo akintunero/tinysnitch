@@ -4,11 +4,10 @@
  * top of it can forget to mask: system prompt, the conversation, tool results, and the arguments the model asks tools
  * to run with (restored before the tool is executed).
  */
-import type Anthropic from "@anthropic-ai/sdk";
-import type { MessagesClient, StreamLike } from "../anthropic/bridge";
+import { type CreateParams, type LlmMessage, type MessageParam, type MessagesClient, type StreamLike, isText, isToolUse } from "../llm/types";
 import { type Pseudonymiser, StreamRestorer } from "./pseudonym";
 
-type Params = Anthropic.MessageCreateParamsNonStreaming;
+type Params = CreateParams;
 
 function maskBlock(p: Pseudonymiser, b: unknown): unknown {
   const block = b as { type?: string; text?: string; content?: unknown; input?: unknown };
@@ -30,16 +29,16 @@ export function maskParams(p: Pseudonymiser, params: Params): Params {
   return {
     ...params,
     system: typeof params.system === "string" ? p.forward(params.system) : params.system,
-    messages: params.messages.map((m) => ({ ...m, content: typeof m.content === "string" ? p.forward(m.content) : (m.content as unknown[]).map((b) => maskBlock(p, b)) })) as Anthropic.MessageParam[],
+    messages: params.messages.map((m) => ({ ...m, content: typeof m.content === "string" ? p.forward(m.content) : (m.content as unknown[]).map((b) => maskBlock(p, b)) })) as MessageParam[],
   };
 }
 
-export function restoreMessage(p: Pseudonymiser, msg: Anthropic.Message): Anthropic.Message {
+export function restoreMessage(p: Pseudonymiser, msg: LlmMessage): LlmMessage {
   return {
     ...msg,
     content: msg.content.map((b) => {
-      if (b.type === "text") return { ...b, text: p.restore(b.text) };
-      if (b.type === "tool_use") return { ...b, input: p.restoreDeep(b.input) };
+      if (isText(b)) return { ...b, text: p.restore(b.text) };
+      if (isToolUse(b)) return { ...b, input: p.restoreDeep(b.input) };
       return b;
     }),
   };

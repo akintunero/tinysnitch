@@ -1,4 +1,4 @@
-import type { MessagesClient } from "@/lib/anthropic/bridge";
+import type { MessagesClient } from "@/lib/llm/loop";
 import { addAudit } from "@/lib/database/repo";
 import { pseudonymisingClient } from "@/lib/privacy/client";
 import { auditPrivacy, pseudonymiserFor } from "@/lib/privacy/session";
@@ -20,12 +20,12 @@ export const POST = route(async (_req, params) => {
   const run = latestRun(ctx.db, parsed.data);
   if (!run) throw new HttpError(404, "Run diagnostics first; there is nothing to explain yet.");
   const findings = openFindings(ctx.db, parsed.data);
-  if (findings.length && (!ctx.anthropic || !ctx.claude.model)) throw new HttpError(503, ctx.claude.configError ?? "Claude is not configured.", "claude_unavailable");
+  if (findings.length && (!ctx.llm || !ctx.claude.model)) throw new HttpError(503, ctx.claude.configError ?? "No AI model is configured.", "claude_unavailable");
 
   let text: string;
   const pseudo = findings.length ? await pseudonymiserFor(ctx.db, parsed.data) : null;
   try {
-    const client = ctx.anthropic as NonNullable<typeof ctx.anthropic>;
+    const client = ctx.llm as NonNullable<typeof ctx.llm>;
     // Only the findings' own text goes out, and through the same masking wrapper as the assistant.
     const masked = pseudo ? (pseudonymisingClient(client as unknown as MessagesClient, pseudo) as unknown as typeof client) : client;
     text = await interpretFindings(masked, ctx.claude.model ?? "", { labTitle: (await labTitle(parsed.data)) ?? parsed.data, findings, run });

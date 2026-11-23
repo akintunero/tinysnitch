@@ -25,8 +25,8 @@ export const POST = route(async (req) => {
   const selected = getSettings(ctx.db).selectedLabId;
   const direct = selected ? providerFor(selected).provider : null;
   const mcp = direct && direct.kind !== "cml" ? ctx.mcp : (await requireMcp()).mcp;
-  if (!ctx.anthropic) throw new HttpError(503, ctx.claude.configError ?? "Claude is not configured.", "claude_unavailable");
-  const live = { ...ctx, anthropic: ctx.anthropic, mcp };
+  if (!ctx.llm) throw new HttpError(503, ctx.claude.configError ?? "No AI model is configured.", "claude_unavailable");
+  const live = { ...ctx, llm: ctx.llm, mcp };
 
   const enc = new TextEncoder();
   const abort = new AbortController();

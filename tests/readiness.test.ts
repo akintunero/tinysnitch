@@ -24,7 +24,7 @@ async function boot(env: "lab" | "production", settings: Record<string, unknown>
   writeFileSync(file, `credentials:\n  c: { username: admin, password: env:TS_TEST_PW }\nsites:\n  - id: s\n    title: S\n    environment: ${env}\n    credential: c\n    devices:\n      - { name: R1, address: 127.0.0.1, port: ${r1.port}, platform: ios, kind: router }\n`);
   const db = openDatabase(":memory:");
   saveSettings(db, { executionMode: "approve", ...settings });
-  setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "no cml", claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null }, anthropic: null, lastConnectAttempt: 0 });
+  setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "no cml", claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null }, llm: null, lastConnectAttempt: 0 });
   const provider = new StaticProvider(file);
   setProviders([provider]);
   return { db, provider };

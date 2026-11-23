@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { MessageParam } from "../llm/types";
 import type { Db } from "../database/db";
 
 export type Part =
@@ -55,7 +55,7 @@ const textOf = (m: StoredMessage) => m.parts.filter((p): p is Extract<Part, { ty
  * What goes back to Claude from earlier turns: the words only. Tool calls and device output are dropped on
  * purpose, so old readings can't be mistaken for the network's current state; Claude must look again.
  */
-export function replayHistory(stored: StoredMessage[], opts: { maxMessages?: number; maxChars?: number } = {}): Anthropic.MessageParam[] {
+export function replayHistory(stored: StoredMessage[], opts: { maxMessages?: number; maxChars?: number } = {}): MessageParam[] {
   const maxMessages = opts.maxMessages ?? 20;
   const maxChars = opts.maxChars ?? 24_000;
   const turns = stored.map((m) => ({ role: m.role, text: textOf(m) })).filter((t) => t.text).slice(-maxMessages);
@@ -66,7 +66,7 @@ export function replayHistory(stored: StoredMessage[], opts: { maxMessages?: num
     if (total > maxChars && kept.length) break;
     kept.unshift(t);
   }
-  const out: Anthropic.MessageParam[] = [];
+  const out: MessageParam[] = [];
   for (const t of kept) {
     const last = out.at(-1);
     if (last && last.role === t.role) last.content = `${last.content as string}\n\n${t.text}`; // roles must alternate

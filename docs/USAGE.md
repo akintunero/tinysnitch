@@ -58,7 +58,7 @@ it has old code.
 
 | Variable | Purpose |
 |---|---|
-| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | The assistant and "Explain findings". Optional: diagnostics, backups, drift and changes work without them. |
+| `LLM_PROVIDER` (`anthropic` or `openai`), `LLM_MODEL`, `LLM_BASE_URL`, `LLM_API_KEY` | The assistant and "Explain findings". `openai` means any server that speaks the OpenAI chat-completions format (OpenAI, Azure OpenAI, OpenRouter, vLLM, LM Studio, Ollama), local models included; the key is optional for a local one. `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` still work for `anthropic`. Optional: diagnostics, backups, drift and changes work without them. |
 | `CML_MCP_*` | Connect to a Cisco Modeling Labs MCP server (stdio or http). Optional. |
 | `TS_INVENTORY_FILE` | Path to your inventory file for real devices, for example `./inventory.yaml`. |
 | `SSH_PASSWORD`, `SSH_ENABLE`, `SSH_KEY_PASSPHRASE` | Whatever names your inventory references as `env:NAME`. |
@@ -450,7 +450,7 @@ Not available yet: a secrets vault (secrets are env variables or files), built-i
 
 ## 9. The assistant and what leaves your network
 
-The assistant and "Explain findings" send device output and topology to the AI model provider you configure (today the Anthropic API). Secrets are always masked first. By
+The assistant and "Explain findings" send device output and topology to the AI model provider you configure (Anthropic, or any OpenAI-compatible server; a local one keeps it on your network). Secrets are always masked first. By
 default, for production networks, **identifying data is masked too**: IP and MAC addresses, device and network names, user and domain
 names are replaced with stand-ins before the request and put back in what you read. Addresses in one subnet stay in one subnet, so
 The model can still reason about adjacency. Object names (route-maps, prefix-lists, ACLs, VRFs) are split into words, generic purpose words
@@ -500,7 +500,7 @@ See the README for the full list of events, the signature check and what is not 
 | "the SSH host key changed … Refusing to connect" | By design. Check the device was really replaced or re-keyed. If so, remove its row from the `known_hosts` table of the SQLite database (`data/tiny-snitch.db`); the row's `id` is `address:port`, for example `10.0.0.1:22`. There is no button for this. Then pin the new key with `hostKey:`. |
 | Inventory error on start-up, naming a path like `discovery.0.allow` | The file failed validation. The message names the place. Common ones: a literal password, a missing credential, a seed outside `allow`, a range wider than `/8`. |
 | My network does not appear | Check `TS_INVENTORY_FILE` is set and points at the file, that the app was restarted, and **Settings → Connections** for the inventory's status. |
-| "The lab MCP connection needs attention" | Check **Settings → Connections**. After restarting the dev server it can take a few seconds to reconnect; reload the page. |
+| "The MCP connection needs attention" | Check **Settings → Connections**. After restarting the dev server it can take a few seconds to reconnect; reload the page. |
 | New code does not seem to take effect (development) | Restart `npm run dev`; the dev server can keep an old module loaded. Do not restart while a change is applying. |
 | No devices in the service form | The form lists the network's routers and switches from its topology. Check the network is selected and loaded. |
 | "Running on the devices" is empty | No backup has been saved for this network yet. Take one on the Backups page. |
@@ -536,7 +536,7 @@ npm run start                     # run it (http://127.0.0.1:3000)
 npm run dev                       # development server
 npm test                          # unit, API, SSH and change-workflow tests
 npm run typecheck
-npm run mcp:inspect -- --probe    # connect to the lab MCP server, list its tools, run one read-only tool
+npm run mcp:inspect -- --probe    # connect to the MCP server, list its tools, run one read-only tool
 npm run claude:smoke              # Claude calls a read-only CML tool through the bridge
 npm run capture -- <labId> <node> [node ...] [--out folder]   # save real device output as test fixtures (read-only)
 docker compose up --build         # run in a container

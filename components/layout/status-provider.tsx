@@ -15,7 +15,7 @@ export type Status = {
   };
   claude: {
     configured: boolean; model: string | null; configError: string | null;
-    verification: "unverified" | "ok" | "error"; checkedAt: string | null; error: string | null;
+    verification: "unverified" | "ok" | "error"; checkedAt: string | null; error: string | null; provider?: string | null; endpoint?: string | null;
   };
 };
 

@@ -8,11 +8,11 @@ import { HttpError } from "./http";
 /** Connected MCP service, or an honest 503 saying what is wrong with the connection. */
 export async function requireMcp(): Promise<{ ctx: Ctx; mcp: NonNullable<Ctx["mcp"]> }> {
   const ctx = getContext();
-  if (!ctx.mcp) throw new HttpError(503, ctx.mcpConfigError ?? "The lab MCP connection is not configured.", "mcp_unavailable");
+  if (!ctx.mcp) throw new HttpError(503, ctx.mcpConfigError ?? "The MCP connection is not configured.", "mcp_unavailable");
   await connectMcp();
   const h = ctx.mcp.health();
   if (h.status !== "connected") {
-    throw new HttpError(503, `The lab MCP server is not connected${h.lastError ? `: ${h.lastError}` : "."}`, "mcp_unavailable");
+    throw new HttpError(503, `The MCP server is not connected${h.lastError ? `: ${h.lastError}` : "."}`, "mcp_unavailable");
   }
   return { ctx, mcp: ctx.mcp };
 }
@@ -44,7 +44,7 @@ export async function fetchScopes(): Promise<ScopeList> {
   const providers = getProviders();
   if (providers.length === 0) {
     const why = [getContext().mcpConfigError, ...providerProblems.map((p) => `${p.provider}: ${p.message}`)].filter(Boolean).join(" ");
-    throw new HttpError(503, why || "No inventory is configured: set up the lab MCP connection or an inventory file.", "mcp_unavailable");
+    throw new HttpError(503, why || "No inventory is configured: set up the MCP connection or an inventory file.", "mcp_unavailable");
   }
   const labs: LabSummary[] = [];
   const warnings: string[] = [];

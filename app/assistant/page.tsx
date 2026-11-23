@@ -13,8 +13,8 @@ export default function Assistant() {
     return (
       <>
         <PageHeader title="Network Assistant" />
-        <EmptyState title="The lab MCP connection needs attention" action={<Link href="/settings" className="text-[13px] underline">Open Settings</Link>}>
-          {status.mcp.configError ?? status.mcp.lastError ?? "Tiny Snitch is not connected to the lab MCP server yet."} The assistant answers only from live network data, so it stays off until the connection is up.
+        <EmptyState title="The MCP connection needs attention" action={<Link href="/settings" className="text-[13px] underline">Open Settings</Link>}>
+          {status.mcp.configError ?? status.mcp.lastError ?? "Tiny Snitch is not connected to the MCP server yet."} The assistant answers only from live network data, so it stays off until the connection is up.
         </EmptyState>
       </>
     );
@@ -24,7 +24,7 @@ export default function Assistant() {
       <>
         <PageHeader title="Network Assistant" />
         <EmptyState title="No AI model is configured" action={<Link href="/settings" className="text-[13px] underline">Open Settings</Link>}>
-          {status.claude.configError ?? "Set ANTHROPIC_API_KEY and ANTHROPIC_MODEL in .env.local and restart."}
+          {status.claude.configError ?? "Choose a model in .env.local (see .env.example) and restart."}
         </EmptyState>
       </>
     );

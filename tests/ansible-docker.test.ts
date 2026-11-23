@@ -170,7 +170,7 @@ describe("Ansible inventory as a network source", () => {
     process.env.TS_ANSIBLE_PASSWORD = "secret";
     const file = join(mkdtempSync(join(tmpdir(), "ts-ans-")), "inventory.yml");
     writeFileSync(file, `all:\n  vars: { ansible_user: admin }\n  children:\n    bench:\n      vars: { tiny_snitch_environment: lab }\n      hosts:\n        R1: { ansible_host: 127.0.0.1, ansible_port: ${d.port}, ansible_network_os: ios }\n`);
-    setContext({ db: openDatabase(":memory:"), mcp: null, mcpConfig: null, mcpConfigError: "no cml", claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null }, anthropic: null, lastConnectAttempt: 0 });
+    setContext({ db: openDatabase(":memory:"), mcp: null, mcpConfig: null, mcpConfigError: "no cml", claude: { configured: false, model: null, configError: null, verification: "unverified", checkedAt: null, error: null }, llm: null, lastConnectAttempt: 0 });
     setProviders([provider(file)]);
     const { run } = await runDiagnostics("ansible:bench", { pings: false });
     expect(run.devices[0]).toMatchObject({ label: "R1", inspected: true, commandsFailed: 0 });

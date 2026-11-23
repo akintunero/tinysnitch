@@ -47,7 +47,7 @@ export async function fetchTopology(scopeId: string, refresh = false): Promise<T
   const { getProviders, providerFor } = await import("../providers/registry");
   const { provider } = providerFor(scopeId);
   if (!provider) {
-    if (getProviders().length === 0) throw new HttpError(503, getContext().mcpConfigError ?? "No inventory is configured: set up the lab MCP connection or an inventory file.", "mcp_unavailable");
+    if (getProviders().length === 0) throw new HttpError(503, getContext().mcpConfigError ?? "No inventory is configured: set up the MCP connection or an inventory file.", "mcp_unavailable");
     throw new HttpError(404, "That network is not provided by any configured inventory.");
   }
   return provider.getTopology(scopeId, refresh);

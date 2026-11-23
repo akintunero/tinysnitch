@@ -38,7 +38,7 @@ const REMOTE = "tinysnitch.corp.example:3000"; // not localhost: what another sy
 
 function boot(opts: { login?: boolean } = {}) {
   const db = openDatabase(":memory:");
-  setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "no cml", lastConnectAttempt: 0, anthropic: null, claude });
+  setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "no cml", lastConnectAttempt: 0, llm: null, claude });
   return db;
 }
 const ctx = (p: Record<string, string> = {}) => ({ params: Promise.resolve(p) });

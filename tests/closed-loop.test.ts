@@ -51,7 +51,7 @@ describe("filing a finding's fix as a change", () => {
     const file = join(mkdtempSync(join(tmpdir(), "ts-fix-")), "inv.yaml");
     writeFileSync(file, "credentials:\n  c: { username: admin, password: env:TS_FIX_PW }\nsites:\n  - id: s\n    title: S\n    environment: lab\n    credential: c\n    devices:\n      - { name: R1, address: 127.0.0.1, port: 1, platform: ios }\n      - { name: R2, address: 127.0.0.2, port: 1, platform: ios }\n");
     const db = openDatabase(":memory:");
-    setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "x", lastConnectAttempt: 0, anthropic: null, claude });
+    setContext({ db, mcp: null, mcpConfig: null, mcpConfigError: "x", lastConnectAttempt: 0, llm: null, claude });
     setProviders([new StaticProvider(file)]);
     return db;
   }

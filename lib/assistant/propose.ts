@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { BridgeTool, ExecuteResult } from "../anthropic/bridge";
+import type { BridgeTool, ExecuteResult } from "../llm/loop";
 import { ChangeError, proposeAndMaybeApply } from "../changes/engine";
 
 /**

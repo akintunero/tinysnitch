@@ -73,7 +73,7 @@ export default function Settings() {
     setNote(null);
     try {
       await apiSend("POST", kind === "reconnect" ? "/api/mcp/reconnect" : "/api/claude/verify");
-      setNote(kind === "reconnect" ? "Reconnected to the lab MCP server." : "AI model check passed.");
+      setNote(kind === "reconnect" ? "Reconnected to the MCP server." : "AI model check passed.");
     } catch (e) {
       setNote((e as Error).message);
     } finally {
@@ -109,18 +109,20 @@ export default function Settings() {
       <Section title="AI model">
         <dl>
           <Row label="API connection"><StatusDot tone={claudeTone(claude)} label={claudeLabel(claude)} /></Row>
+          {claude?.endpoint ? <Row label="Provider">{claude.endpoint}</Row> : null}
           <Row label="Model"><span className="font-mono text-[12px]">{claude?.model ?? "not set"}</span></Row>
           {claude?.error ? <Row label="Last check"><span className="text-bad">{claude.error}</span></Row> : null}
           {claude?.checkedAt ? <Row label="Checked">{relativeTime(claude.checkedAt)}</Row> : null}
         </dl>
         <p className="text-soft mt-2 text-[12px]">
-          The API key and model come from <code className="font-mono">ANTHROPIC_API_KEY</code> and <code className="font-mono">ANTHROPIC_MODEL</code> in <code className="font-mono">.env.local</code>.
+          The provider, model and key come from <code className="font-mono">LLM_PROVIDER</code>, <code className="font-mono">LLM_MODEL</code>, <code className="font-mono">LLM_BASE_URL</code> and <code className="font-mono">LLM_API_KEY</code> in <code className="font-mono">.env.local</code>
+          (<code className="font-mono">ANTHROPIC_API_KEY</code> and <code className="font-mono">ANTHROPIC_MODEL</code> still work). Any OpenAI-compatible server, local models included, can be used.
           The key stays on the server and is never shown here. Restart the app after changing it.
         </p>
         <div className="mt-3"><Button onClick={() => void act("verify")} disabled={!claude?.configured || busy !== null}>{busy === "verify" ? "Checking" : "Verify connection"}</Button></div>
       </Section>
 
-      <Section title="Lab MCP server">
+      <Section title="MCP server (lab simulators, optional)">
         <dl>
           <Row label="Status"><StatusDot tone={mcpTone(mcp?.status)} label={mcp?.status ?? "checking"} /></Row>
           <Row label="Transport">{mcp?.transport ?? "not configured"}</Row>
@@ -166,10 +168,10 @@ export default function Settings() {
                 <span className="text-[13px] font-medium">Security and hygiene baseline in Diagnostics</span>
                 <select value={settings.complianceChecks} onChange={(e) => void save({ complianceChecks: e.target.value as ComplianceMode })} className="mt-1 block h-8 rounded-sm border border-line bg-bg px-2 text-[13px]">
                   <option value="production">Production networks only (default)</option>
-                  <option value="all">All networks, labs included</option>
+                  <option value="all">All networks, test networks included</option>
                   <option value="off">Off</option>
                 </select>
-                <span className="text-soft block text-[12px]">SSH version 2, Telnet on VTY lines, clear-text passwords, default SNMP communities, the HTTP server, NTP, syslog and AAA, on IOS devices. It is noise on throwaway labs, which is why labs are skipped by default.</span>
+                <span className="text-soft block text-[12px]">SSH version 2, Telnet on VTY lines, clear-text passwords, default SNMP communities, the HTTP server, NTP, syslog and AAA, on IOS devices. It can be noise on test networks, which is why they are skipped by default.</span>
               </label>
               <Check checked={settings.requireSecondApprover} onChange={(v) => void save({ requireSecondApprover: v })} title="Require a second person to approve production changes" text="The person who proposed a change to a production network cannot be the one who approves it, as long as another approver exists. Only applies while login is on; if nobody else can approve, it is allowed and recorded." />
               <Check checked={settings.requireDeviceReadiness} onChange={(v) => void save({ requireDeviceReadiness: v })} title="Require each device to be ready before a production change touches it" text="A device needs a recent backup, no unreviewed changes made outside Tiny Snitch, and a person's sign-off (on the Backups page). A change that touches a device that is not ready is refused when it is proposed, and again when it is applied. Labs are never held to it." />
@@ -189,7 +191,7 @@ export default function Settings() {
                 <span className="text-[13px] font-medium">Hide identifying data from the AI model</span>
                 <select value={settings.llmPrivacy} onChange={(e) => void save({ llmPrivacy: e.target.value as PrivacyMode })} className="mt-1 block h-8 rounded-sm border border-line bg-bg px-2 text-[13px]">
                   <option value="production">Production networks only (default)</option>
-                  <option value="all">All networks, labs included</option>
+                  <option value="all">All networks, test networks included</option>
                   <option value="off">Off: send real values</option>
                 </select>
                 <span className="text-soft block text-[12px]">IP and IPv6 addresses, device and network names, MAC addresses, user and domain names, descriptions and banners are replaced with stand-ins before anything is sent to the AI model, and put back in what you read. Addresses in the same subnet stay in the same subnet, so the model can still reason about the topology. The mapping stays in this server's memory. Credentials are always removed. Each request is recorded in Activity with what was replaced.</span>

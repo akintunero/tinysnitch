@@ -1,4 +1,4 @@
-import { BASE_SYSTEM } from "../anthropic/bridge";
+import { BASE_SYSTEM } from "../llm/loop";
 import type { ExecutionMode } from "../settings";
 
 export type LabContext = { id: string; title: string } | null;

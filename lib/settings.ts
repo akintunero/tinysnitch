@@ -16,7 +16,7 @@ export const settingsSchema = z.object({
   autopilotAllowConfig: z.boolean().default(false),
   snapshotBeforeChange: z.boolean().default(true),
   diagnosticsOnLabSelect: z.boolean().default(false),
-  /** Security and hygiene baseline in Diagnostics (SSH v2, telnet, default SNMP, NTP...). Right for production, noise on throwaway labs. */
+  /** Security and hygiene baseline in Diagnostics (SSH v2, telnet, default SNMP, NTP...). Right for production, noise on test networks. */
   complianceChecks: z.enum(COMPLIANCE_MODES).default("production"),
   /** Pseudonymise what is sent to Claude: production networks only by default, since a lab holds nothing worth hiding. */
   llmPrivacy: z.enum(PRIVACY_MODES).default("production"),

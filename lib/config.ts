@@ -103,6 +103,41 @@ export function loadAnthropicConfig(env: Env = process.env): AnthropicConfig {
   return { apiKey: apiKey!, model: model! };
 }
 
+export type LlmProvider = "anthropic" | "openai";
+export type LlmConfig = { provider: LlmProvider; model: string; apiKey?: string; baseUrl?: string; allowInsecure: boolean };
+
+/**
+ * Which AI model to use, from the environment:
+ *   LLM_PROVIDER=anthropic (default) | openai   ("openai" means any server that speaks the OpenAI chat-completions format:
+ *   OpenAI, Azure OpenAI, OpenRouter, vLLM, LM Studio, Ollama and most gateways)
+ *   LLM_MODEL, LLM_API_KEY, LLM_BASE_URL (required for openai; optional for anthropic, to reach a compatible gateway)
+ * ANTHROPIC_API_KEY and ANTHROPIC_MODEL still work for the anthropic provider.
+ */
+export function loadLlmConfig(env: Env = process.env): LlmConfig {
+  const raw = (env.LLM_PROVIDER ?? "anthropic").trim().toLowerCase();
+  const provider: LlmProvider | null = raw === "anthropic" ? "anthropic" : raw === "openai" || raw === "openai-compatible" ? "openai" : null;
+  if (!provider) throw new ConfigError(`LLM_PROVIDER=${env.LLM_PROVIDER} is not supported. Use anthropic or openai.`, ["LLM_PROVIDER"]);
+  const baseUrl = env.LLM_BASE_URL?.trim() || undefined;
+  const allowInsecure = env.LLM_ALLOW_INSECURE_HTTP === "1";
+  if (provider === "anthropic") {
+    const apiKey = (env.LLM_API_KEY ?? env.ANTHROPIC_API_KEY)?.trim();
+    const model = (env.LLM_MODEL ?? env.ANTHROPIC_MODEL)?.trim();
+    const missing = [!apiKey && "ANTHROPIC_API_KEY", !model && "ANTHROPIC_MODEL"].filter((x): x is string => !!x);
+    if (missing.length) throw new ConfigError(`Missing ${missing.join(" and ")}.`, missing);
+    return { provider, apiKey, model: model!, baseUrl, allowInsecure };
+  }
+  const model = env.LLM_MODEL?.trim();
+  const missing = [!baseUrl && "LLM_BASE_URL", !model && "LLM_MODEL"].filter((x): x is string => !!x);
+  if (missing.length) throw new ConfigError(`Missing ${missing.join(" and ")} for LLM_PROVIDER=openai.`, missing);
+  return { provider, apiKey: (env.LLM_API_KEY ?? env.OPENAI_API_KEY)?.trim() || undefined, model: model!, baseUrl, allowInsecure };
+}
+
+/** One line saying where requests go, without a key: for Settings. */
+export function describeLlm(c: LlmConfig): string {
+  if (!c.baseUrl) return c.provider === "anthropic" ? "Anthropic API" : "OpenAI-compatible server";
+  try { const u = new URL(c.baseUrl); return `${c.provider === "anthropic" ? "Anthropic-format" : "OpenAI-compatible"} server at ${u.protocol}//${u.host}${u.pathname.replace(/\/$/, "")}`; } catch { return "the configured server"; }
+}
+
 const SECRET_FLAG = /(key|token|secret|pass(word)?|auth)/i;
 
 /** Safe to show: values of secret-looking flags are masked. */
