@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/components/layout/status-provider";
 import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import type { ChatEvent } from "@/lib/assistant/chat";
 import type { Conversation, Part, StoredMessage } from "@/lib/assistant/history";
 import { apiGet, apiSend } from "@/lib/client";
@@ -11,16 +12,20 @@ import { ToolCall } from "./tool-call";
 
 type UiMessage = { key: string; role: "user" | "assistant"; parts: Part[]; error: string | null; streaming: boolean };
 
-const EXAMPLES = [
-  "What devices are in this lab?",
-  "Show me the current network topology.",
-  "Which interfaces are administratively down?",
-  "Show the running configuration of the first router.",
-  "Why might OSPF adjacency not be forming?",
-  "Give me a health summary of this lab.",
+/** Starting questions that name the selected network and one of its routers, so they fit what is on screen. */
+const examples = (network: string | null, router: string | null) => [
+  `Summarise the health of ${network ?? "this network"}.`,
+  "Which interfaces are down, and is that expected?",
+  router ? `Show the running configuration of ${router}.` : "Show the running configuration of a router.",
+  "Which routing sessions are not established, and why?",
+  "What changed on these devices recently?",
 ];
 
-const fromStored = (m: StoredMessage): UiMessage => ({ key: `s${m.id}`, role: m.role, parts: m.parts, error: m.error, streaming: false });
+const KEY = "ts.conversation";
+const remember = (id: string | null) => { try { if (id) localStorage.setItem(KEY, id); else localStorage.removeItem(KEY); } catch { /* storage can be blocked */ } };
+const recall = () => { try { return localStorage.getItem(KEY); } catch { return null; } };
+
+const fromStored =(m: StoredMessage): UiMessage => ({ key: `s${m.id}`, role: m.role, parts: m.parts, error: m.error, streaming: false });
 
 export function ChatView() {
   const { settings, labs } = useApp();
@@ -35,6 +40,15 @@ export function ChatView() {
   const scroller = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const pinned = useRef(true);
+  const [router, setRouter] = useState<string | null>(null);
+  useEffect(() => {
+    setRouter(null);
+    const id = settings?.selectedLabId;
+    if (!id) return;
+    apiGet<{ nodes: { label: string; kind: string }[] }>(`/api/labs/${encodeURIComponent(id)}/topology`)
+      .then((t) => setRouter(t.nodes.find((n) => n.kind === "router" || n.kind === "l3switch")?.label ?? null))
+      .catch(() => undefined);
+  }, [settings?.selectedLabId]);
   const labTitle = labs.labs.find((l) => l.id === settings?.selectedLabId)?.title ?? settings?.selectedLabTitle ?? null;
 
   const loadList = useCallback(async () => {
@@ -57,14 +71,43 @@ export function ChatView() {
   const open = async (id: string | null) => {
     setProblem(null);
     setConfirmDelete(false);
-    if (!id) { setConversationId(null); setMessages([]); return; }
+    if (!id) { setConversationId(null); setMessages([]); remember(null); return; }
     try {
       const r = await apiGet<{ messages: StoredMessage[] }>(`/api/conversations/${id}`);
       setConversationId(id);
-      setMessages(r.messages.map(fromStored));
+      remember(id);
+      const shown = r.messages.map(fromStored);
+      // The server keeps answering after you leave the page and saves the reply when it is done. If the last saved
+      // message is still the question, show it as pending and look again until the answer arrives.
+      if (shown.at(-1)?.role === "user") shown.push({ key: "pending", role: "assistant", parts: [], error: null, streaming: true });
+      setMessages(shown);
       pinned.current = true;
-    } catch (e) { setProblem((e as Error).message); }
+      if (shown.at(-1)?.key === "pending") waitFor(id);
+    } catch (e) { setProblem((e as Error).message); remember(null); }
   };
+
+  const poll = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (poll.current) clearTimeout(poll.current); }, []);
+  const waitFor = (id: string, tries = 0) => {
+    if (poll.current) clearTimeout(poll.current);
+    poll.current = setTimeout(async () => {
+      try {
+        const r = await apiGet<{ messages: StoredMessage[] }>(`/api/conversations/${id}`);
+        if (r.messages.at(-1)?.role === "assistant") { setMessages(r.messages.map(fromStored)); return; }
+      } catch { /* try again */ }
+      if (tries < 100) waitFor(id, tries + 1);
+      else patchLast((m) => ({ ...m, streaming: false, error: "No answer was saved. Ask again." }));
+    }, 3000);
+  };
+
+  // Leaving the page unmounts this view, so the open conversation is remembered and reopened on return.
+  // A question handed over with ?q= starts fresh instead.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("q")) return;
+    const id = recall();
+    if (id) void open(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const remove = async () => {
     if (!conversationId) return;
@@ -76,7 +119,7 @@ export function ChatView() {
   const patchLast = (fn: (m: UiMessage) => UiMessage) => setMessages((all) => all.map((m, i) => (i === all.length - 1 ? fn(m) : m)));
 
   const apply = (e: ChatEvent) => {
-    if (e.type === "conversation") { setConversationId(e.id); return; }
+    if (e.type === "conversation") { setConversationId(e.id); remember(e.id); return; }
     patchLast((m) => {
       const parts = [...m.parts];
       if (e.type === "text") {
@@ -155,15 +198,25 @@ export function ChatView() {
           {conversationId ? (confirmDelete
             ? <><Button size="sm" onClick={() => void remove()}>Delete it</Button><Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>Keep</Button></>
             : <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(true)} disabled={busy}>Delete</Button>) : null}
+          {conversations.length > 1 && !busy ? (
+            <ConfirmButton
+              size="sm"
+              variant="ghost"
+              label="Delete all"
+              message={`Deletes all ${conversations.length} conversations for this network, messages included. Recorded in Activity.`}
+              onConfirm={() => apiSend("DELETE", "/api/conversations")}
+              onDone={async () => { await open(null); await loadList(); }}
+            />
+          ) : null}
         </div>
       </div>
 
       <div ref={scroller} onScroll={(e) => { const el = e.currentTarget; pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }} className="min-h-0 flex-1 overflow-y-auto pr-1" aria-live="polite">
         {messages.length === 0 ? (
           <div className="py-6">
-            <p className="text-[13px]">Ask about the selected network. The assistant reads real device and topology data each time it answers. It cannot change a device itself: when you ask for a change it files a proposal, which you approve on the Configurations page.</p>
+            <p className="text-[13px]">Ask about the selected network. The assistant reads live device data each time it answers. It cannot change a device: a change you ask for becomes a proposal on the Configurations page.</p>
             <ul className="mt-4 space-y-1.5">
-              {EXAMPLES.map((q) => <li key={q}><button type="button" onClick={() => { setInput(q); inputRef.current?.focus(); }} className="text-left text-[13px] underline decoration-line underline-offset-2 hover:decoration-ink">{q}</button></li>)}
+              {examples(labTitle, router).map((q) => <li key={q}><button type="button" onClick={() => { setInput(q); inputRef.current?.focus(); }} className="text-left text-[13px] underline decoration-line underline-offset-2 hover:decoration-ink">{q}</button></li>)}
             </ul>
           </div>
         ) : null}

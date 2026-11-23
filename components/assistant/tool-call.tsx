@@ -31,7 +31,7 @@ export function ToolCall({ part }: { part: ToolPart }) {
         </div>
         <div>
           <div className="text-soft mb-0.5 text-[11px]">Output (secrets masked)</div>
-          <pre className="max-h-64 overflow-auto rounded-sm bg-ink p-2 font-mono text-[11px] text-surface-2">{running ? "Waiting for CML..." : part.output || "(no output)"}</pre>
+          <pre className="max-h-64 overflow-auto rounded-sm bg-code p-2 font-mono text-[11px] text-code-ink">{running ? "Waiting for CML..." : part.output || "(no output)"}</pre>
         </div>
       </div>
     </details>

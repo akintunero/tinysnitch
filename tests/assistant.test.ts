@@ -79,7 +79,7 @@ function install(claude?: Anthropic, opts: { claudeConfigured?: boolean } = {}) 
     claude: { configured: opts.claudeConfigured ?? !!claude, model: "test-model", configError: claude ? null : "Missing ANTHROPIC_API_KEY.", verification: "unverified", checkedAt: null, error: null },
   };
   setContext(ctx);
-  saveSettings(ctx.db, { selectedLabId: LAB, selectedLabTitle: "Test Lab" });
+  saveSettings(ctx.db, { selectedLabId: LAB, selectedLabTitle: "Test Lab", llmPrivacy: "off" });
   return ctx;
 }
 
@@ -170,6 +170,51 @@ describe("executor", () => {
   it("lets the server's schema validation reject bad arguments", async () => {
     const run = await exec();
     expect(await run("get_nodes_for_cml_lab", {})).toMatchObject({ isError: true, content: expect.stringMatching(/Invalid arguments/) });
+  });
+});
+
+describe("chat turn with masking on", () => {
+  it("sends no real device name, lab name or address to Claude, and still shows them to the engineer", async () => {
+    const { client, seen } = scriptedClaude([
+      toolUse("t1", "send_cli_command", { lid: LAB, label: "R1", commands: "show running-config" }),
+      text("Done."),
+    ]);
+    const ctx = install(client);
+    saveSettings(ctx.db, { llmPrivacy: "all" });
+    const { status, events } = await chat({ message: "Why is 10.0.15.2 down on R1 in Test Lab?" });
+    expect(status).toBe(200);
+    const wire = JSON.stringify(seen);
+    for (const real of ["10.0.15.2", "Test Lab"]) expect(wire, real).not.toContain(real);
+    // R1 was typed by the engineer before any config declared it as a hostname, so it is only hidden once the topology names it;
+    // the tool result that does declare it must be masked.
+    expect(JSON.stringify(seen[1])).not.toContain("hostname R1");
+    expect(events.find((e) => e.type === "tool_start")).toMatchObject({ input: { label: "R1" } });
+    expect(listAudit(ctx.db).some((e) => e.kind === "claude" && /replaced/.test(e.summary))).toBe(true);
+  });
+});
+
+describe("switching masking in the middle of a conversation", () => {
+  it("follows the setting on every turn, and masks earlier turns again when it is turned back on", async () => {
+    const { client, seen } = scriptedClaude([text("one"), text("two"), text("three")]);
+    const ctx = install(client);
+    const ask = async (message: string, conversationId?: string) => {
+      const { events } = await chat({ message, conversationId });
+      return (events[0] as Extract<ChatEvent, { type: "conversation" }>).id;
+    };
+
+    saveSettings(ctx.db, { llmPrivacy: "all" });
+    const id = await ask("Why is 10.0.15.2 down?");
+    expect(JSON.stringify(seen[0])).not.toContain("10.0.15.2");
+
+    saveSettings(ctx.db, { llmPrivacy: "off" });
+    await ask("And 10.0.15.6?", id);
+    expect(JSON.stringify(seen[1])).toContain("10.0.15.6"); // off means off
+    expect(JSON.stringify(seen[1])).toContain("10.0.15.2");
+
+    saveSettings(ctx.db, { llmPrivacy: "all" });
+    await ask("Anything else on 10.0.15.9?", id);
+    const wire = JSON.stringify(seen[2]);
+    for (const real of ["10.0.15.2", "10.0.15.6", "10.0.15.9"]) expect(wire, real).not.toContain(real);
   });
 });
 

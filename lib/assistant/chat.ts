@@ -4,6 +4,8 @@ import { addAudit, getSettings } from "../database/repo";
 import type { Ctx } from "../server/context";
 import { createExecutor } from "./executor";
 import { type Part, addMessage, createConversation, getConversation, getMessages, replayHistory } from "./history";
+import { pseudonymisingClient } from "../privacy/client";
+import { auditPrivacy, pseudonymiserFor } from "../privacy/session";
 import { providerFor } from "../providers/registry";
 import { NEUTRAL_TOOLS, createNeutralExecutor } from "./neutral";
 import { PROPOSE_TOOL } from "./propose";
@@ -76,9 +78,12 @@ export async function runChat(
     let error: string | null = null;
     let toolCalls = 0;
     let stopReason: string | null = null;
+    // Everything that crosses to Claude goes through one wrapper that swaps identifying data for stand-ins and back.
+    const pseudo = await pseudonymiserFor(db, settings.selectedLabId, [settings.selectedLabTitle]);
+    const rawClient = ctx.anthropic as unknown as MessagesClient;
     try {
       const result = await runToolLoop({
-        client: ctx.anthropic as unknown as MessagesClient,
+        client: pseudo ? pseudonymisingClient(rawClient, pseudo) : rawClient,
         model,
         system: buildSystem(settings.selectedLabId ? { id: settings.selectedLabId, title: settings.selectedLabTitle ?? settings.selectedLabId } : null, settings.executionMode, neutral ? { production: scoped ? await isProduction(settings.selectedLabId!) : false, direct: true } : undefined),
         messages,
@@ -115,6 +120,7 @@ export async function runChat(
       if (!(e instanceof AbortedError)) addAudit(db, { kind: "error", actor: "system", summary: `Assistant turn failed: ${error}`, data: { conversationId: conv.id } });
     }
 
+    auditPrivacy(db, "Assistant turn", pseudo, settings.selectedLabId);
     addMessage(db, conv.id, "assistant", parts, error);
     if (error) input.emit({ type: "error", message: error });
     else input.emit({ type: "done", toolCalls, stopReason });

@@ -75,3 +75,8 @@ export function replayHistory(stored: StoredMessage[], opts: { maxMessages?: num
   while (out.length && out[0].role !== "user") out.shift();
   return out;
 }
+
+/** Deletes every conversation of a network (or all of them when no network is given), messages included. */
+export function clearConversations(db: Db, labId: string | null): number {
+  return Number((labId ? db.prepare("DELETE FROM conversations WHERE lab_id = ?").run(labId) : db.prepare("DELETE FROM conversations").run()).changes);
+}

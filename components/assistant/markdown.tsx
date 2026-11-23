@@ -22,7 +22,7 @@ const components: ComponentProps<typeof ReactMarkdown>["components"] = {
   table: ({ children }) => <div className="my-2 overflow-x-auto"><table className="w-full border-collapse text-[13px]">{children}</table></div>,
   th: ({ children }) => <th className="border-b border-line px-2 py-1 text-left font-semibold">{children}</th>,
   td: ({ children }) => <td className="border-b border-line px-2 py-1 align-top">{children}</td>,
-  pre: ({ children }) => <pre className="my-2 overflow-x-auto rounded-sm bg-ink p-3 font-mono text-[12px] leading-relaxed text-surface-2 [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-inherit">{children}</pre>,
+  pre: ({ children }) => <pre className="my-2 overflow-x-auto rounded-sm bg-code p-3 font-mono text-[12px] leading-relaxed text-code-ink [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-inherit">{children}</pre>,
   code: ({ children }) => <code className="rounded-sm bg-surface-2 px-1 py-0.5 font-mono text-[12px]">{children}</code>,
 };
 
