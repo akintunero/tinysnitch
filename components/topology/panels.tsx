@@ -85,8 +85,8 @@ export function DevicePanel({ node, topology, findings, onSelectNode, onSelectLi
             );
           })}
         </ul>
-      ) : <p className="text-soft text-[12px]">CML returned no interfaces for this node.</p>}
-      {node.interfaces.every((i) => i.ips.length === 0) ? <p className="text-soft mt-1 text-[11px]">IP addresses are not reported by CML for these interfaces. They come from device inspection (Phase 5).</p> : null}
+      ) : <p className="text-soft text-[12px]">The lab server returned no interfaces for this node.</p>}
+      {node.interfaces.every((i) => i.ips.length === 0) ? <p className="text-soft mt-1 text-[11px]">IP addresses are not reported by the lab server for these interfaces. They come from device inspection (Phase 5).</p> : null}
 
       <H>Neighbours</H>
       {neighbours.length ? (
@@ -122,9 +122,9 @@ export function LinkPanel({ link, topology, findings, onSelectNode, onClose }: {
       {end(link.target, link.targetInterface, "Endpoint B")}
       <H>Status</H>
       <p className="text-[13px] font-medium">{STATUS_SHORT[link.status]}</p>
-      <p className="text-soft text-[12px]">{link.statusText}. CML state: <span className="font-mono">{link.cmlState}</span>.</p>
+      <p className="text-soft text-[12px]">{link.statusText}. Lab server state: <span className="font-mono">{link.cmlState}</span>.</p>
       {link.status === "not_inspected" || link.status === "unknown" ? (
-        <p className="text-soft mt-2 text-[12px]">CML does not report whether traffic passes over a link. A link is shown as operational, down or faulty only once a <Link className="underline" href="/diagnostics">diagnostics run</Link> has read its endpoints.</p>
+        <p className="text-soft mt-2 text-[12px]">The lab server does not report whether traffic passes over a link. A link is shown as operational, down or faulty only once a <Link className="underline" href="/diagnostics">diagnostics run</Link> has read its endpoints.</p>
       ) : <p className="text-soft mt-2 text-[12px]">This state comes from what the devices reported in the latest diagnostics run.</p>}
       <H>Findings</H>
       <Findings findings={findings} />

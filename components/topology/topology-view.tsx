@@ -171,13 +171,13 @@ function Canvas({ labId }: { labId: string }) {
 
   if (error && !topology) {
     return (
-      <EmptyState title={error.code === "capability_missing" ? "This CML server cannot supply the topology" : "Could not load the topology"} action={<Button onClick={() => void load(true)}>Try again</Button>}>
+      <EmptyState title={error.code === "capability_missing" ? "This lab server cannot supply the topology" : "Could not load the topology"} action={<Button onClick={() => void load(true)}>Try again</Button>}>
         {error.message}
       </EmptyState>
     );
   }
-  if (!topology) return <p className="text-soft">Loading the topology from CML...</p>;
-  if (!topology.nodes.length) return <EmptyState title="This lab has no nodes" action={<Button onClick={() => void load(true)}>Refresh</Button>}>CML reports a lab named "{topology.lab.title}" with nothing in it.</EmptyState>;
+  if (!topology) return <p className="text-soft">Loading the topology...</p>;
+  if (!topology.nodes.length) return <EmptyState title="This lab has no nodes" action={<Button onClick={() => void load(true)}>Refresh</Button>}>The lab server reports a lab named "{topology.lab.title}" with nothing in it.</EmptyState>;
 
   const selNode = selection?.type === "node" ? topology.nodes.find((n) => n.id === selection.id) : undefined;
   const selLink = selection?.type === "link" ? topology.links.find((l) => l.id === selection.id) : undefined;

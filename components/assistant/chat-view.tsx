@@ -244,7 +244,7 @@ export function ChatView() {
             {m.parts.map((p, i) => p.type === "text"
               ? (m.role === "user" ? <p key={i} className="whitespace-pre-wrap break-words text-[14px]">{p.text}</p> : <div key={i} className="break-words text-[14px]"><Markdown>{p.text}</Markdown></div>)
               : <ToolCall key={p.id} part={p} />)}
-            {m.streaming ? <p className="text-soft mt-1 text-[12px]">{running ? "Reading from CML..." : m.parts.length ? "Writing..." : "Working..."}</p> : null}
+            {m.streaming ? <p className="text-soft mt-1 text-[12px]">{running ? "Reading from the network..." : m.parts.length ? "Writing..." : "Working..."}</p> : null}
             {m.error ? <p role="alert" className="mt-1 text-[13px] text-bad">{m.error}</p> : null}
           </div>
         ))}

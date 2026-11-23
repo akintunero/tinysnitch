@@ -500,7 +500,7 @@ See the README for the full list of events, the signature check and what is not 
 | "the SSH host key changed … Refusing to connect" | By design. Check the device was really replaced or re-keyed. If so, remove its row from the `known_hosts` table of the SQLite database (`data/tiny-snitch.db`); the row's `id` is `address:port`, for example `10.0.0.1:22`. There is no button for this. Then pin the new key with `hostKey:`. |
 | Inventory error on start-up, naming a path like `discovery.0.allow` | The file failed validation. The message names the place. Common ones: a literal password, a missing credential, a seed outside `allow`, a range wider than `/8`. |
 | My network does not appear | Check `TS_INVENTORY_FILE` is set and points at the file, that the app was restarted, and **Settings → Connections** for the inventory's status. |
-| "The CML MCP connection needs attention" | Check **Settings → Connections**. After restarting the dev server it can take a few seconds to reconnect; reload the page. |
+| "The lab MCP connection needs attention" | Check **Settings → Connections**. After restarting the dev server it can take a few seconds to reconnect; reload the page. |
 | New code does not seem to take effect (development) | Restart `npm run dev`; the dev server can keep an old module loaded. Do not restart while a change is applying. |
 | No devices in the service form | The form lists the network's routers and switches from its topology. Check the network is selected and loaded. |
 | "Running on the devices" is empty | No backup has been saved for this network yet. Take one on the Backups page. |
@@ -536,7 +536,7 @@ npm run start                     # run it (http://127.0.0.1:3000)
 npm run dev                       # development server
 npm test                          # unit, API, SSH and change-workflow tests
 npm run typecheck
-npm run mcp:inspect -- --probe    # connect to the CML MCP server, list its tools, run one read-only tool
+npm run mcp:inspect -- --probe    # connect to the lab MCP server, list its tools, run one read-only tool
 npm run claude:smoke              # Claude calls a read-only CML tool through the bridge
 npm run capture -- <labId> <node> [node ...] [--out folder]   # save real device output as test fixtures (read-only)
 docker compose up --build         # run in a container

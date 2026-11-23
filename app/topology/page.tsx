@@ -16,8 +16,8 @@ export default function Topology() {
     return (
       <>
         <PageHeader title="Topology" />
-        <EmptyState title="The CML MCP connection needs attention" action={<Link href="/settings" className="text-[13px] underline">Open Settings</Link>}>
-          {status.mcp.configError ?? status.mcp.lastError ?? "Tiny Snitch is not connected to the CML MCP server yet."} The topology is drawn from live data only.
+        <EmptyState title="The lab MCP connection needs attention" action={<Link href="/settings" className="text-[13px] underline">Open Settings</Link>}>
+          {status.mcp.configError ?? status.mcp.lastError ?? "Tiny Snitch is not connected to the lab MCP server yet."} The topology is drawn from live data only.
         </EmptyState>
       </>
     );

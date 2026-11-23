@@ -127,7 +127,7 @@ export function DiagnosticsView({ labId, labTitle }: { labId: string; labTitle: 
 
       {error ? <p role="alert" className="mb-3 text-[13px] text-bad">{error}</p> : null}
       {loading ? <p className="text-soft">Loading...</p> : null}
-      {running ? <p className="text-soft mb-3 text-[13px]">Reading devices through CML. This usually takes a few seconds per device.</p> : null}
+      {running ? <p className="text-soft mb-3 text-[13px]">Reading devices. This usually takes a few seconds per device.</p> : null}
 
       {!loading && !run_ ? (
         <EmptyState title="No diagnostics run yet">Run diagnostics to read interface, routing and switching state from the devices that are running. Nothing is changed on any device.</EmptyState>

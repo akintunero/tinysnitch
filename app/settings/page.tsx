@@ -73,7 +73,7 @@ export default function Settings() {
     setNote(null);
     try {
       await apiSend("POST", kind === "reconnect" ? "/api/mcp/reconnect" : "/api/claude/verify");
-      setNote(kind === "reconnect" ? "Reconnected to the CML MCP server." : "AI model check passed.");
+      setNote(kind === "reconnect" ? "Reconnected to the lab MCP server." : "AI model check passed.");
     } catch (e) {
       setNote((e as Error).message);
     } finally {
@@ -120,7 +120,7 @@ export default function Settings() {
         <div className="mt-3"><Button onClick={() => void act("verify")} disabled={!claude?.configured || busy !== null}>{busy === "verify" ? "Checking" : "Verify connection"}</Button></div>
       </Section>
 
-      <Section title="Cisco CML MCP">
+      <Section title="Lab MCP server">
         <dl>
           <Row label="Status"><StatusDot tone={mcpTone(mcp?.status)} label={mcp?.status ?? "checking"} /></Row>
           <Row label="Transport">{mcp?.transport ?? "not configured"}</Row>

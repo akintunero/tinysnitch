@@ -95,7 +95,7 @@ export class McpService {
   private makeTransport(): Transport {
     if (this.opts.transportFactory) return this.opts.transportFactory();
     const c = this.config;
-    if (!c) throw new McpError("The CML MCP connection is not configured.", "not_connected");
+    if (!c) throw new McpError("The lab MCP connection is not configured.", "not_connected");
     if (c.transport === "stdio") {
       // Only a safe default set plus the variables the user listed reach the server process.
       const t = new StdioClientTransport({
@@ -147,7 +147,7 @@ export class McpService {
       await client.close().catch(() => undefined);
       this.state = { ...this.state, status: "error", lastError: message, toolCount: 0 };
       this.log({ op: "connect", ok: false, detail: message });
-      throw new McpError(`Could not connect to the CML MCP server: ${message}`, "transport");
+      throw new McpError(`Could not connect to the lab MCP server: ${message}`, "transport");
     }
   }
 
@@ -196,7 +196,7 @@ export class McpService {
   }
 
   private requireClient(): Client {
-    if (!this.client) throw new McpError("Not connected to the CML MCP server.", "not_connected");
+    if (!this.client) throw new McpError("Not connected to the lab MCP server.", "not_connected");
     return this.client;
   }
 

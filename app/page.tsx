@@ -100,7 +100,7 @@ export default function Overview() {
         <section aria-labelledby="conn">
           <h2 id="conn" className="label mb-1">Connections</h2>
           <dl>
-            <Row label="Cisco CML MCP"><StatusDot tone={mcp && !mcp.configured ? "idle" : mcpTone(mcp?.status)} label={mcp && !mcp.configured ? "not configured" : (mcp?.status ?? "checking")} /></Row>
+            <Row label="Lab MCP server"><StatusDot tone={mcp && !mcp.configured ? "idle" : mcpTone(mcp?.status)} label={mcp && !mcp.configured ? "not configured" : (mcp?.status ?? "checking")} /></Row>
             {mcp?.server ? <Row label="Server">{mcp.server.name} {mcp.server.version}</Row> : null}
             <Row label="Tools discovered">{mcp?.toolCount ?? 0}</Row>
             {mcp?.endpoint ? <Row label="Transport"><span className="block text-left font-mono text-[12px] [overflow-wrap:anywhere]">{mcp.endpoint}</span></Row> : null}
@@ -109,7 +109,7 @@ export default function Overview() {
             {claude?.model ? <Row label="Model"><span className="font-mono text-[12px]">{claude.model}</span></Row> : null}
             {claude && !claude.configured ? <Row label="Configuration"><span className="text-bad">{claude.configError}</span></Row> : null}
           </dl>
-          <p className="text-soft mt-2 text-[12px]">{mcp?.configured ? `Last attempt ${relativeTime(mcp?.lastAttempt)}. ` : "CML is optional; networks can also come from an inventory file, Ansible or NetBox. "}<Link className="underline" href="/settings">Settings</Link></p>
+          <p className="text-soft mt-2 text-[12px]">{mcp?.configured ? `Last attempt ${relativeTime(mcp?.lastAttempt)}. ` : "A lab MCP server is optional; networks can also come from an inventory file, Ansible or NetBox. "}<Link className="underline" href="/settings">Settings</Link></p>
         </section>
 
         <section aria-labelledby="lab">

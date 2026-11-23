@@ -63,7 +63,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="space-y-2 border-t border-line py-3 pl-3 pr-3">
         {status?.mcp.configured === false ? null : (
           <div className="flex items-center justify-between text-[12px]">
-            <span className="text-soft">CML MCP</span>
+            <span className="text-soft">Lab MCP</span>
             <StatusDot tone={mcpTone(status?.mcp.status)} label={status?.mcp.status ?? "checking"} />
           </div>
         )}
@@ -105,7 +105,7 @@ function Header({ onMenu }: { onMenu: () => void }) {
       </label>
       {current?.environment === "production" ? <Badge className="text-warn"><span title="Changes here always need a person's approval">Production</span></Badge> : null}
       <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-4">
-        {status?.mcp.configured === false ? null : <StatusDot className="hidden sm:inline-flex" tone={mcpTone(status?.mcp.status)} label={`CML ${status?.mcp.status ?? "checking"}`} />}
+        {status?.mcp.configured === false ? null : <StatusDot className="hidden sm:inline-flex" tone={mcpTone(status?.mcp.status)} label={`Lab MCP ${status?.mcp.status ?? "checking"}`} />}
         {session?.authEnabled && session.user ? (
           <span className="flex items-center gap-2 text-[12px]">
             <span title={session.user.roleText}>{session.user.username} <span className="text-soft">({session.user.role})</span></span>

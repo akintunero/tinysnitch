@@ -68,7 +68,7 @@ export async function runChat(
     // CML networks use the MCP server's own read tools; every other network goes through its provider and transport.
     const scoped = settings.selectedLabId ? providerFor(settings.selectedLabId).provider : null;
     const neutral = scoped && scoped.kind !== "cml" ? scoped : null;
-    if (!neutral && !mcp) throw new Error("The CML MCP connection is not available.");
+    if (!neutral && !mcp) throw new Error("The lab MCP connection is not available.");
     const cmlToolSet = neutral ? null : buildToolSet(mcp!.tools());
     const tools = neutral ? NEUTRAL_TOOLS : [...cmlToolSet!.tools, ...(settings.selectedLabId ? [PROPOSE_TOOL] : [])];
     const parts: Part[] = [];

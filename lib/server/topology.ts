@@ -16,7 +16,7 @@ export function clearTopologyCache(): void {
 async function readTool(mcp: McpService, tool: string, args: Record<string, string>, what: string): Promise<string> {
   try {
     const r = await mcp.callTool(tool, args);
-    if (!r.ok) throw new HttpError(502, `CML reported an error reading ${what}: ${r.text.slice(0, 200)}`);
+    if (!r.ok) throw new HttpError(502, `The lab server reported an error reading ${what}: ${r.text.slice(0, 200)}`);
     return r.text;
   } catch (e) {
     if (e instanceof HttpError) throw e;
@@ -47,7 +47,7 @@ export async function fetchTopology(scopeId: string, refresh = false): Promise<T
   const { getProviders, providerFor } = await import("../providers/registry");
   const { provider } = providerFor(scopeId);
   if (!provider) {
-    if (getProviders().length === 0) throw new HttpError(503, getContext().mcpConfigError ?? "No inventory is configured: set up the CML MCP connection or an inventory file.", "mcp_unavailable");
+    if (getProviders().length === 0) throw new HttpError(503, getContext().mcpConfigError ?? "No inventory is configured: set up the lab MCP connection or an inventory file.", "mcp_unavailable");
     throw new HttpError(404, "That network is not provided by any configured inventory.");
   }
   return provider.getTopology(scopeId, refresh);
@@ -69,7 +69,7 @@ export async function fetchCmlTopology(labId: string, refresh = false): Promise<
   const ifacesTool = tools.get(caps.getNodeInterfaces.tool!)!;
 
   const lab = (await fetchCmlLabs()).find((l) => l.id === labId);
-  if (!lab) throw new HttpError(404, "CML has no lab with that id.");
+  if (!lab) throw new HttpError(404, "The lab server has no lab with that id.");
 
   try {
     const warnings: string[] = [];

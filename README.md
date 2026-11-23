@@ -30,7 +30,7 @@ Tiny Snitch is written against two interfaces, so nothing outside `lib/providers
 a network is a lab or real hardware.
 
 - **Inventory provider** says what exists and whether it can be reached.
-  - **CML**, through your CML MCP server.
+  - **A lab simulator**, through its MCP server. Today the shipped adapter speaks Cisco CML's tools; other simulators (EVE-NG and similar) need their own adapter.
   - **Inventory file** (`TS_INVENTORY_FILE`): sites, devices, optional links, credential references. See `inventory.example.yaml`.
   - **Ansible inventory** (`TS_ANSIBLE_INVENTORY`): YAML, JSON or INI. Each top-level group becomes a network; see below.
   - **NetBox**: sites, devices (primary IP, platform, role) and cables.

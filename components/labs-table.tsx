@@ -20,7 +20,7 @@ export function LabsTable() {
   if (labs.error && !labs.labs.length) {
     return (
       <EmptyState title="No network source is available" action={<Button onClick={() => void refreshLabs()}>Try again</Button>}>
-        {labs.error}{status?.mcp.configured === false ? " Set up the CML MCP connection, or point TS_INVENTORY_FILE at an inventory file (see the README)." : ""}
+        {labs.error}{status?.mcp.configured === false ? " Set up the lab MCP connection, or point TS_INVENTORY_FILE at an inventory file (see the README)." : ""}
       </EmptyState>
     );
   }

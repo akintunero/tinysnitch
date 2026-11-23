@@ -46,10 +46,10 @@ export async function runDiagnostics(scopeId: string, opts: { pings?: boolean } 
   try {
     const ctx = getContext();
     const { provider } = providerFor(scopeId);
-    if (!provider) throw new HttpError(503, ctx.mcpConfigError ?? "No inventory provides that network. Check the CML connection or the inventory file.", "mcp_unavailable");
+    if (!provider) throw new HttpError(503, ctx.mcpConfigError ?? "No inventory provides that network. Check the lab MCP connection or the inventory file.", "mcp_unavailable");
     if (provider.kind === "cml") {
       const { mcp } = await requireMcp(); // connects first, so the tool list is known
-      if (!hasCliRunner(mcp)) throw new HttpError(501, "The CML MCP server has no tool Tiny Snitch can use to run read-only CLI commands, so devices cannot be inspected.", "capability_missing");
+      if (!hasCliRunner(mcp)) throw new HttpError(501, "The lab MCP server has no tool Tiny Snitch can use to run read-only CLI commands, so devices cannot be inspected.", "capability_missing");
     }
     const startedAt = new Date().toISOString();
     const topology = await provider.getTopology(scopeId, true);

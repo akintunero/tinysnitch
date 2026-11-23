@@ -13,8 +13,8 @@ export default function Assistant() {
     return (
       <>
         <PageHeader title="Network Assistant" />
-        <EmptyState title="The CML MCP connection needs attention" action={<Link href="/settings" className="text-[13px] underline">Open Settings</Link>}>
-          {status.mcp.configError ?? status.mcp.lastError ?? "Tiny Snitch is not connected to the CML MCP server yet."} The assistant answers only from live CML data, so it stays off until the connection is up.
+        <EmptyState title="The lab MCP connection needs attention" action={<Link href="/settings" className="text-[13px] underline">Open Settings</Link>}>
+          {status.mcp.configError ?? status.mcp.lastError ?? "Tiny Snitch is not connected to the lab MCP server yet."} The assistant answers only from live network data, so it stays off until the connection is up.
         </EmptyState>
       </>
     );
