@@ -1,0 +1,52 @@
+# Tiny Snitch inventory for real devices. Point TS_INVENTORY_FILE at a copy of this file.
+#
+# Secrets are never written here. A credential says where its secret lives:
+#   password: env:SSH_PASSWORD          read from that environment variable (set it in .env.local)
+#   privateKey: file:C:/keys/id_ed25519 read from that file
+# A literal password is rejected when the file is loaded.
+
+credentials:
+  netops:
+    username: netops
+    password: env:SSH_PASSWORD
+    enablePassword: env:SSH_ENABLE      # optional; only if the login lands in user mode (">")
+  backup:
+    username: admin
+    privateKey: file:C:/keys/id_ed25519
+
+# Optional bastion hosts. A device that names one is reached through it.
+jumpHosts:
+  bastion:
+    address: 203.0.113.10
+    credential: netops
+
+sites:
+  - id: london
+    title: London office
+    environment: production            # lab | production. Production changes always need a person's approval.
+    description: Core and access
+    credential: netops                 # default for the devices below
+    devices:
+      - { name: lon-core1, address: 10.10.0.1, platform: ios, kind: router }
+      - { name: lon-sw1,   address: 10.10.0.11, platform: ios, kind: l2switch }
+      - { name: lon-leaf1, address: 10.10.0.21, platform: eos, kind: router, credential: backup, jump: bastion }
+      # Devices whose changes need an API name their transport. API transports need a credential with a password reference.
+      - { name: lon-eos1,  address: 10.10.0.31, platform: eos,   kind: router, transport: eapi }              # Arista eAPI (https, port 443)
+      - { name: lon-nx1,   address: 10.10.0.41, platform: nxos,  kind: router, transport: nxapi }             # Cisco NX-API (https, port 443)
+      - { name: lon-jun1,  address: 10.10.0.51, platform: junos, kind: router, transport: netconf }           # NETCONF over SSH (port 830); commit confirmed
+      # - { name: lab-eos1, address: 10.10.0.32, platform: eos, transport: eapi, insecureTls: true }         # self-signed certificate: an explicit risk
+      # hostKey pins a device's SSH key; without it the first key seen is remembered and any change is refused.
+      # - { name: lon-edge1, address: 10.10.0.2, platform: ios, hostKey: "SHA256:..." }
+    links:                             # optional; or run discovery to find them from CDP/LLDP
+      - { a: lon-core1, aInterface: GigabitEthernet0/1, b: lon-sw1, bInterface: GigabitEthernet0/0 }
+
+# Find a network by crawling CDP/LLDP neighbour tables from a seed. Read-only, capped.
+discovery:
+  - id: branch-crawl
+    title: Branch network (discovered)
+    environment: production
+    credential: netops
+    seeds:
+      - { address: 10.20.0.1, platform: ios }
+    maxDevices: 30
+    maxDepth: 3

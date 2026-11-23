@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+/* Off-white, grey, charcoal. Colour is reserved for state. */
+@theme {
+  --color-bg: #F3F2EE;
+  --color-surface: #FAF9F6;
+  --color-surface-2: #E7E6E0;
+  --color-ink: #292B2D;
+  --color-muted: #858783;
+  --color-line: #D8D7D1;
+  --color-ok: #39845A;
+  --color-warn: #B77936;
+  --color-bad: #B94B45;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Consolas, monospace;
+
+  --radius-sm: 3px;
+  --radius-md: 5px;
+}
+
+html { background: var(--color-bg); }
+body { background: var(--color-bg); color: var(--color-ink); font-family: var(--font-sans); font-size: 14px; line-height: 1.5; }
+:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; }
+::selection { background: var(--color-surface-2); }
+
+/* Secondary text that must stay readable. The specified grey (#858783) is reserved for icons,
+   timestamps and placeholders, where it does not carry meaning on its own. */
+.text-soft { color: color-mix(in srgb, var(--color-ink) 68%, var(--color-bg)); }
